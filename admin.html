@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Store Admin — The Frag Man Plug (Demo)</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="admin-body">
+
+<header class="admin-top">
+  <div class="admin-top-inner">
+    <a class="brand" href="index.html"><span class="brand-mark">FP</span><span class="brand-text">The Frag Man <em>Plug</em></span></a>
+    <div class="admin-title">
+      <h1>Store Admin</h1>
+      <span class="demo-badge">DEMO</span>
+    </div>
+    <a class="btn btn-ghost btn-sm" href="index.html">← Back to Store</a>
+  </div>
+  <p class="admin-notice">Demo admin panel — in the real build this page is password-protected and completely invisible to customers. Changes you make here are saved in this browser and reflected on the storefront instantly.</p>
+</header>
+
+<nav class="admin-tabs" role="tablist">
+  <button class="admin-tab active" data-tab="products" role="tab">Products <span class="tab-count" id="tabProductCount"></span></button>
+  <button class="admin-tab" data-tab="orders" role="tab">Orders <span class="tab-count" id="tabOrderCount"></span></button>
+  <button class="admin-tab" data-tab="settings" role="tab">Settings</button>
+</nav>
+
+<main class="admin-main">
+
+  <!-- ══════════ PRODUCTS ══════════ -->
+  <section class="admin-pane active" id="pane-products">
+    <div class="admin-toolbar">
+      <input type="search" id="adminSearch" placeholder="Search products…" aria-label="Search products">
+      <select id="adminBrandFilter" aria-label="Filter by brand"><option value="all">All brands</option></select>
+      <span class="admin-count" id="adminCount"></span>
+    </div>
+    <div class="table-wrap">
+      <table class="admin-table">
+        <thead><tr>
+          <th>Product</th><th>Brand</th>
+          <th class="num">3ml $</th><th class="num">5ml $</th><th class="num">10ml $</th>
+          <th>Stock</th>
+        </tr></thead>
+        <tbody id="productRows"></tbody>
+      </table>
+    </div>
+    <p class="admin-hint">Tip: click any price to edit it, flip the stock switch to mark a product out of stock. Everything saves automatically and updates the storefront.</p>
+  </section>
+
+  <!-- ══════════ ORDERS ══════════ -->
+  <section class="admin-pane" id="pane-orders">
+    <div class="stat-row" id="orderStats"></div>
+    <div class="table-wrap">
+      <table class="admin-table">
+        <thead><tr>
+          <th>Order</th><th>Customer</th><th>Items</th><th class="num">Total</th><th>Status</th><th>Date</th>
+        </tr></thead>
+        <tbody id="orderRows"></tbody>
+      </table>
+    </div>
+    <p class="admin-hint">Mock orders for the demo — in the real build these arrive live from checkout, with customer emails and tracking numbers.</p>
+  </section>
+
+  <!-- ══════════ SETTINGS ══════════ -->
+  <section class="admin-pane" id="pane-settings">
+    <form class="settings-form" id="settingsForm">
+      <label>Store name
+        <input type="text" id="setStoreName" maxlength="60">
+      </label>
+      <label>Announcement bar text
+        <input type="text" id="setAnnouncement" maxlength="120">
+      </label>
+      <label>Free shipping threshold (USD)
+        <input type="number" id="setShipThreshold" min="0" step="1">
+      </label>
+      <label>Support email
+        <input type="email" id="setSupportEmail" maxlength="80">
+      </label>
+      <div class="settings-actions">
+        <button type="submit" class="btn btn-gold">Save Settings</button>
+        <button type="button" class="btn btn-ghost" id="resetDemo">Reset demo data</button>
+      </div>
+    </form>
+    <p class="admin-hint">In the real build, settings here control the live storefront — announcement bar, shipping rules, taxes and notification emails.</p>
+  </section>
+
+</main>
+
+<footer class="admin-foot">
+  <p>The Frag Man Plug — demo admin · <a href="index.html">View storefront</a></p>
+</footer>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="products.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>
