@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<title>VEGArance — Authentic Fragrance Decants</title>
-<meta name="description" content="VEGArance — Authentic Middle Eastern and designer fragrances as hand-poured decants, full bottles and custom hybrid mixes. Discover your next signature scent.">
+<title>VEGArance — Fragrance, Fashion & Everyday Luxury</title>
+<meta name="description" content="VEGArance — Fragrance, beauty, fashion, accessories and home. Explore considered collections and everyday luxury at VEGArance.">
 <link rel="stylesheet" href="fonts.css">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="refinement.css">
@@ -16,7 +16,7 @@
 <body>
 <a class="skip-link" href="#shop">Skip to collection</a>
 
-<div class="announce">VEGARANCE <span> / </span> THE ART OF SCENT <span> / </span> COLLECTION PREVIEW</div>
+<div class="announce">VEGARANCE <span> / </span> THE ART OF LIVING <span> / </span> COLLECTION PREVIEW</div>
 
 <!-- ══════════ NAV ══════════ -->
 <header class="nav" id="nav">
@@ -30,12 +30,12 @@
       <div class="nav-drop">
         <a href="#shop" class="drop-btn">Shop ▾</a>
         <div class="drop-menu">
-          <a href="#shop">All Fragrances</a>
+          <a href="#shop">All Products</a>
           <a href="#sizes">Find Your Size</a>
           <a href="#mix">Custom Hybrid Mix</a>
-          <span class="drop-soon">Candles <em>soon</em></span>
-          <span class="drop-soon">Soaps <em>soon</em></span>
-          <span class="drop-soon">Body Products <em>soon</em></span>
+          <a href="#shop" data-category="Fashion">Fashion</a>
+          <a href="#shop" data-category="Beauty">Beauty</a>
+          <a href="#shop" data-category="Accessories">Accessories</a><a href="#shop" data-category="Home">Home</a>
         </div>
       </div>
       <a href="#mix">Hybrid Mix</a>
@@ -53,9 +53,9 @@
 <section class="hero" id="home">
   <div class="hero-inner">
     <div class="hero-content">
-      <p class="eyebrow">VEGARANCE · A study in scent</p>
+      <p class="eyebrow">VEGARANCE · Everyday, elevated</p>
       <h1>Leave a little<br><span class="gold"><em>of yourself.</em></span></h1>
-      <p class="hero-sub">A scent becomes a memory. Explore remarkable fragrance houses in intimate sizes, and discover the signature that stays with you.</p>
+      <p class="hero-sub">Fragrance that stays with you. Fashion that feels like you. Considered details for your home and everyday rituals. Explore the world of VEGArance.</p>
       <div class="hero-cta">
         <a href="#shop" class="btn btn-gold">Explore the Collection</a>
         <a href="#mix" class="btn btn-ghost">Create Your Own Blend</a>
@@ -92,18 +92,19 @@
     <p class="section-sub">A few familiar names to begin your fragrance discovery.</p>
   </div>
   <div class="grid cards" id="featuredGrid"></div>
-  <div class="center"><a href="#shop" class="btn btn-ghost">Explore All Fragrances</a></div>
+  <div class="center"><a href="#shop" class="btn btn-ghost">Explore All Products</a></div>
 </section>
 
 <!-- ══════════ SHOP ══════════ -->
 <section class="section tint" id="shop"><div class="wrap">
   <div class="section-head">
     <p class="eyebrow">The Vault</p>
-    <h2>Shop <span class="gold">Fragrances</span></h2>
-    <p class="section-sub">Every scent available as a hand-poured decant — 3ml, 5ml or 10ml. Search the vault or filter by brand.</p>
+    <h2>Discover <span class="gold">the collection.</span></h2>
+    <p class="section-sub">Explore fragrance, beauty, fashion, accessories and home. Our fragrance edit is available to preview; new collections are being curated.</p>
   </div>
+<div class="category-tabs" aria-label="Product categories"><button type="button" data-category="all" aria-pressed="false">All collections</button><button type="button" data-category="Fragrance" aria-pressed="false">Fragrance</button><button type="button" data-category="Beauty" aria-pressed="false">Beauty</button><button type="button" data-category="Fashion" aria-pressed="false">Fashion</button><button type="button" data-category="Accessories" aria-pressed="false">Accessories</button><button type="button" data-category="Home" aria-pressed="false">Home</button></div>
   <div class="search-row">
-    <input type="search" id="shopSearch" placeholder="Search a fragrance or brand…" aria-label="Search fragrances">
+    <input type="search" id="shopSearch" placeholder="Search a product or brand…" aria-label="Search products">
   </div>
   <div class="catalog-toolbar"><p class="shop-count" id="shopCount" aria-live="polite"></p><label>Sort by <select id="shopSort"><option value="original">Collection order</option><option value="az">Name: A–Z</option><option value="price">Price: low to high</option></select></label></div>
   <div class="filters" id="brandChips"></div>
@@ -175,25 +176,25 @@
   <div class="section-head">
     <p class="eyebrow">The House Expands</p>
     <h2>Coming <span class="gold">Soon</span></h2>
-    <p class="section-sub">VEGArance universe is growing. Be first to know.</p>
+    <p class="section-sub">A wider world of VEGArance is taking shape. Discover the next collections.</p>
   </div>
   <div class="grid soon-grid">
     <div class="soon-card">
       <div class="soon-icon">01</div>
-      <h3>Luxury Candles</h3>
-      <p>A new way to bring fragrance home. Collection details will be shared when ready.</p>
+      <h3>Fashion & Accessories</h3>
+      <p>Considered silhouettes and finishing touches. Supplier collections are being selected.</p>
       <span class="soon-tag">Future collection</span>
     </div>
     <div class="soon-card">
       <div class="soon-icon">02</div>
-      <h3>Artisan Soaps</h3>
-      <p>A future collection for your daily ritual. Product details are still to come.</p>
+      <h3>Beauty & Ritual</h3>
+      <p>Essentials for a more considered daily ritual. Products will appear as collections are approved.</p>
       <span class="soon-tag">Future collection</span>
     </div>
     <div class="soon-card">
       <div class="soon-icon">03</div>
-      <h3>Body Collection</h3>
-      <p>More ways to enjoy fragrance, beyond the bottle. Discover the collection at launch.</p>
+      <h3>Home & Living</h3>
+      <p>Objects and accents that make a space your own. A new collection is on its way.</p>
       <span class="soon-tag">Future collection</span>
     </div>
   </div>
@@ -255,7 +256,7 @@
     </div>
     <div class="f-col">
       <h4>Shop</h4>
-      <a href="#shop">All Fragrances</a><a href="#sizes">Find Your Size</a><a href="#mix">Custom Hybrid Mix</a>
+      <a href="#shop">All Products</a><a href="#sizes">Find Your Size</a><a href="#mix">Custom Hybrid Mix</a>
     </div>
     <div class="f-col">
       <h4>Soon</h4>
@@ -318,9 +319,11 @@
 
 <script src="products.js"></script>
 <script src="catalog-store.js"></script>
+<script src="catalog-model.js"></script>
 <script src="product-images.js"></script>
 <script src="app.js"></script>
 <script src="experience.js"></script>
 <script src="saved-scents.js"></script>
+<script src="categories.js"></script>
 </body>
 </html>

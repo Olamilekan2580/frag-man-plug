@@ -9,10 +9,18 @@ async function stop(){if(child&&!child.killed){const closed=new Promise(resolve=
 async function req(path,method='GET',value,origin=base){const response=await fetch(base+path,{method,headers:{'Content-Type':'application/json',Origin:origin,...(cookie?{Cookie:cookie}:{})},body:value?JSON.stringify(value):undefined});const data=await response.json();return {status:response.status,data,cookie:response.headers.get('set-cookie')};}
 try{
  await start();assert.equal((await req('/api/products')).data.length,215);
+ assert.equal((await req('/api/suppliers/cj/status')).status,401);
  const input={name:'Integration Test Fragrance',brand:'Test House',line:'Discovery',blurb:'An integration-test product.',image:'',prices:{'3ml':8.5,'5ml':13,'10ml':22},inStock:true};
  assert.equal((await req('/api/products','POST',input)).status,401);
  assert.equal((await req('/api/login','POST',{password:'wrong'})).status,401);
  const login=await req('/api/login','POST',{password:'test-owner-password-123'});assert.equal(login.status,200);cookie=login.cookie.split(';')[0];
+ assert.equal((await req('/api/suppliers/cj/status')).data.market,'US');
+ const lifestyle={name:'Linen shirt',brand:'VEGArance',category:'Fashion',inStock:true,variants:[{id:'medium',label:'Ivory / Medium',sku:'SHIRT-M',inStock:true},{id:'large',label:'Ivory / Large',sku:'SHIRT-L',inStock:false}],prices:{medium:45,large:48}};
+ assert.equal((await req('/api/products','POST',{...lifestyle,variants:[lifestyle.variants[0],lifestyle.variants[0]]})).status,422);
+ const shirt=await req('/api/products','POST',lifestyle);assert.equal(shirt.status,201);assert.equal(shirt.data.category,'Fashion');
+ assert.equal((await req('/api/orders','POST',{state:'Florida',items:[{productId:shirt.data.id,size:'large',qty:1}]})).status,422);
+ assert.equal((await req('/api/orders','POST',{state:'Florida',items:[{productId:shirt.data.id,size:'3ml',qty:1}]})).status,422);
+ const shirtOrder=await req('/api/orders','POST',{state:'Florida',items:[{productId:shirt.data.id,size:'medium',qty:1,price:.01}]});assert.equal(shirtOrder.data.subtotal,45);assert.match(shirtOrder.data.items,/Ivory \/ Medium/);await req('/api/orders/'+shirtOrder.data.id,'DELETE');await req('/api/products/'+shirt.data.id,'DELETE');
  assert.equal((await req('/api/products','POST',input,'https://attacker.example')).status,403);
  assert.equal((await req('/api/products','POST',{...input,name:'   '})).status,422);
  assert.equal((await req('/api/products','POST',{...input,prices:{'3ml':-1,'5ml':1,'10ml':2}})).status,422);

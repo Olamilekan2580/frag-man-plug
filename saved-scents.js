@@ -3,7 +3,7 @@ const savedToggle=document.createElement('button');
 savedToggle.type='button';savedToggle.className='chip saved-toggle';
 document.querySelector('.catalog-toolbar').prepend(savedToggle);
 function syncSaved(){
-  savedToggle.textContent=`Saved scents (${savedIds.size})`;
+  savedToggle.textContent=`Saved pieces (${savedIds.size})`;
   savedToggle.setAttribute('aria-pressed',String(savedOnly));
   savedToggle.classList.toggle('active',savedOnly);
   document.querySelectorAll('[data-save]').forEach(button=>{

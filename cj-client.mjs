@@ -1,0 +1,16 @@
+/* Read-only CJ catalog connector. No supplier purchases or payment methods. */
+const API='https://developers.cjdropshipping.com/api2.0/v1/';
+export function createCJ({apiKey=process.env.CJ_API_KEY||'',fetcher=fetch}={}){
+ let token='',expires=0,queue=Promise.resolve(),last=0;
+ const failure=(status,message)=>Object.assign(new Error(message),{status});
+ async function call(path,body,authenticated=true){
+  if(!apiKey)throw failure(503,'Configure CJ_API_KEY privately on Render to connect CJ.');
+  if(authenticated&&(!token||expires<Date.now())){const auth=await call('authentication/getAccessToken',{apiKey},false);if(!auth?.accessToken)throw failure(502,'CJ authentication returned no token');token=auth.accessToken;expires=Date.parse(auth.accessTokenExpiryDate)||Date.now()+3600000;}
+  const task=queue.then(async()=>{const delay=Math.max(0,1050-(Date.now()-last));if(delay)await new Promise(resolve=>setTimeout(resolve,delay));last=Date.now();let response,data;try{response=await fetcher(API+path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json',...(authenticated?{'CJ-Access-Token':token}:{})},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(20000)});data=await response.json();}catch{throw failure(502,'CJ is temporarily unavailable. Try again later.');}if(!response.ok||data.code!==200||data.result===false){if([1600001,1600002].includes(data.code)){token='';expires=0;}throw failure(response.status===429?429:502,'CJ rejected the request. Check account permissions or try again later.');}return data.data;});queue=task.catch(()=>{});return task;
+ }
+ return {
+  configured:!!apiKey,
+  async search(query,page=1){const params=new URLSearchParams({keyWord:query,page:String(page),size:'12',countryCode:'US'});const data=await call('product/listV2?'+params);return {page,total:data?.totalRecords||0,products:(data?.content||[]).flatMap(group=>group.productList||[]).map(p=>({id:p.id,name:p.nameEn,image:/^https:\/\//.test(p.bigImage||'')?p.bigImage:'',cost:p.sellPrice,stock:p.warehouseInventoryNum,category:p.oneCategoryName}))};},
+  async draft(id,category,markup){const p=await call('product/query?'+new URLSearchParams({pid:id}));if(!Array.isArray(p?.variants)||!p.variants.length||p.variants.length>100)throw failure(422,'This supplier product needs manual variant review.');const prices={},variants=p.variants.map(v=>{const cost=Number(v.variantSellPrice);if(!Number.isFinite(cost)||cost<=0)throw failure(422,'Supplier option price requires manual review.');prices[v.vid]=Math.round(cost*(1+markup/100)*100)/100;return {id:v.vid,label:String(v.variantKey||v.variantNameEn||v.variantSku).slice(0,160),sku:String(v.variantSku||'').slice(0,100),inStock:false};});return {name:String(p.productNameEn||'').slice(0,160),brand:'VEGArance',category,line:'',blurb:'',image:/^https:\/\//.test(p.bigImage||'')?p.bigImage:'',inStock:false,variants,prices,supplier:{provider:'cj',productId:id}};}
+ };
+}

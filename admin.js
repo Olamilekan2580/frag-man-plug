@@ -53,11 +53,11 @@ function renderProducts(){
   $('#productRows').innerHTML = list.map(p=>{
     const stock = inStock(p);
     return `<tr data-row="${p.id}" class="${stock?'':'oos-row'}">
-      <td class="pname"><button class="product-name-button" data-product-action="view" data-pid="${p.id}">${esc(p.name)}</button>${p.line?`<small>${esc(p.line)}</small>`:''}</td>
+      <td class="pname"><button class="product-name-button" data-product-action="view" data-pid="${p.id}">${esc(p.name)}</button><small>${esc(categoryOf(p))}${p.line?' · '+esc(p.line):''}</small></td>
       <td>${esc(p.brand)}</td>
-      ${['3ml','5ml','10ml'].map(s=>
+      ${Array.from({length:3},(_,i)=>optionsOf(p)[i]?.id).map(s=>s?
         `<td class="num" data-label="${s} USD"><input type="number" min="1" step="0.01" class="price-in" data-pid="${p.id}" data-size="${s}" value="${effPrice(p,s)}" aria-label="${esc(p.name)} ${s} price"></td>`
-      ).join('')}
+      :'<td class="num">—</td>').join('')}
       <td><button class="stock-toggle ${stock?'on':''}" data-stock="${p.id}" aria-pressed="${stock}">
         <span class="knob"></span><span class="st-label">${stock?'In stock':'Out of stock'}</span>
       </button></td>

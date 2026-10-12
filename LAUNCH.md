@@ -15,4 +15,4 @@ Launch dependencies:
 - Capture delivery addresses only in the real sales flow. Add transactional order emails and fulfillment tracking.
 - Replace representative product artwork with distinct approved images or actual photography. Paid image API use was declined for this release.
 
-Country/currency, catalog direction and payment preference were requested and remain unanswered. No payment credentials were requested in chat or committed.
+Owner confirmed expansion into lifestyle categories, United States market, custom store with CJ API. Country/currency are US/USD for the initial release. Payment provider remains undecided. Owner-only CJ US catalog search and draft preparation are implemented; credentials are pending. See `CJ-SETUP.md`. Stock/cost scheduling, payment-triggered supplier purchases and tracking are still outstanding. No payment credentials were requested in chat or committed.

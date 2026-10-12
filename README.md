@@ -4,6 +4,8 @@ Independent fragrance storefront owned by the project author. Work locally with 
 
 Current release: VEGArance identity, ink/plum and ivory palette, responsive catalog, saved scent shortlist, product image uploads, authenticated product/order/settings management. Existing catalog prices and artwork remain illustrative; real sales are not enabled. Browser storage is isolated under `vegarance_` keys.
 
+Lifestyle expansion adds Fragrance, Beauty, Fashion, Accessories and Home category browsing, arbitrary size/color options with individual availability and prices, and an owner-only CJ catalog search/draft connector for the United States. See [CJ-SETUP.md](CJ-SETUP.md) to configure `CJ_API_KEY` privately on Render. Supplier orders are not yet automated; preview checkout remains active. New category collections display honest empty states until products are approved.
+
 Before taking real orders: confirm sellable inventory and prices, country/currency and fulfillment policies; connect a payment account and verified webhook; use durable database/upload storage; add transactional email and real shipping/tax rules. The existing free Render filesystem may reset.
 
 ## Technical reference

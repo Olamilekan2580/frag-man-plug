@@ -57,7 +57,7 @@ $('#shopSort').onchange=e=>{sortOrder=e.target.value;visibleLimit=24;renderShop(
 document.addEventListener('click',e=>{
   const quantity=e.target.closest('[data-qty]');
   if(quantity){const it=cart[+quantity.dataset.qty];if(!it)return;it.qty=Math.min(99,it.qty+Number(quantity.dataset.delta));if(it.qty<=0)cart.splice(+quantity.dataset.qty,1);renderCart();}
-  if(e.target.closest('#clearFilters')){activeBrand='all';searchTerm='';$('#shopSearch').value='';visibleLimit=24;renderBrandChips();renderShop();}
+  if(e.target.closest('#clearFilters')){activeBrand='all';activeCategory='all';savedOnly=false;searchTerm='';$('#shopSearch').value='';visibleLimit=24;renderBrandChips();renderShop();renderCategories();syncSaved();}
   if(e.target.classList.contains('modal'))closeOverlays();
 });
 document.addEventListener('keydown',e=>{

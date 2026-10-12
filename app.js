@@ -38,6 +38,7 @@ if (!Array.isArray(cart)) cart = [];
 cart = cart.filter(it => it && typeof it.name === 'string' && typeof it.detail === 'string' && Number.isFinite(it.price) && it.price > 0).map(it => ({...it, qty: Math.min(99, Math.max(1, Math.floor(it.qty || 1)))}));
 let visibleLimit = 24, sortOrder = 'original';
 let activeBrand = 'all';
+let activeCategory = 'all';
 let searchTerm = '';
 const savedIds = new Set((()=>{const ids=readStore('vegarance_saved',[]);return Array.isArray(ids)?ids.filter(id=>typeof id==='string'&&byId(id)):[];})());
 let savedOnly = false;
@@ -57,15 +58,15 @@ function cardHTML(p){
     <div class="card-visual">
       <button class="save-scent" data-save="${esc(p.id)}" aria-pressed="${savedIds.has(p.id)}" aria-label="${savedIds.has(p.id)?'Unsave':'Save'} ${esc(p.name)}">${savedIds.has(p.id)?'♥':'♡'}</button>
       <div class="mono-tile" aria-hidden="true">${esc(p.mono)}</div>
-      <img class="card-img" src="${esc(brandImg(p))}" alt="${esc(p.name)} — catalog artwork using representative AI brand imagery" width="560" height="700" loading="lazy" decoding="async" onerror="this.style.display='none'">
+      <img class="card-img" src="${esc(brandImg(p))}" alt="${esc(p.name)}" width="560" height="700" loading="lazy" decoding="async" onerror="this.style.display='none'">
       ${oos?'<span class="oos-tag">Out of stock</span>':''}
     </div>
     <div class="card-body">
       <p class="card-family">${esc(famLabel(p).toUpperCase())}</p>
       <h3>${esc(p.name)}</h3>
-      <p class="card-notes">3ml / 5ml / 10ml · Discovery sizes</p>
+      <p class="card-notes">${esc(categoryOf(p))} · ${optionsOf(p).length} options</p>
       <div class="card-foot">
-        <span class="card-price">${money(p.prices['3ml'])}<small>3ml decant · demo price</small></span>
+        <span class="card-price">${money(startingPrice(p))}<small>From · preview price</small></span>
         <button class="card-btn" data-view="${p.id}" aria-label="Choose size for ${esc(p.name)}">Choose size ↗</button>
       </div>
     </div>
@@ -75,23 +76,24 @@ function cardHTML(p){
 function filteredProducts(){
   const q = searchTerm.trim().toLowerCase();
   const list = PRODUCTS.filter(p=>{
+    if(activeCategory!=='all'&&categoryOf(p)!==activeCategory)return false;
     if(savedOnly && !savedIds.has(p.id)) return false;
     if(activeBrand!=='all' && p.brand!==activeBrand) return false;
     if(q && !(p.name.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q) || (p.line||'').toLowerCase().includes(q))) return false;
     return true;
   });
   if(sortOrder==='az') list.sort((a,b)=>a.name.localeCompare(b.name));
-  if(sortOrder==='price') list.sort((a,b)=>a.prices['3ml']-b.prices['3ml'] || a.name.localeCompare(b.name));
+  if(sortOrder==='price') list.sort((a,b)=>startingPrice(a)-startingPrice(b) || a.name.localeCompare(b.name));
   return list;
 }
 
 function renderShop(){
   const list = filteredProducts();
   $('#shopGrid').innerHTML = list.slice(0,visibleLimit).map(cardHTML).join('') ||
-    `<div class="empty-state"><h3>No scents found.</h3><p>Try another name or explore the whole collection.</p><button class="btn btn-ghost" id="clearFilters">Reset filters</button></div>`;
+    `<div class="empty-state"><p class="eyebrow">${activeCategory==='all'?'The collection':esc(activeCategory)}</p><h3>${activeCategory!=='all'&&!PRODUCTS.some(p=>categoryOf(p)===activeCategory)?'A new chapter is coming.':'No products found.'}</h3><p>Explore the current collection while we curate what comes next.</p><button class="btn btn-ghost" id="clearFilters">Explore all products</button></div>`;
   const total = PRODUCTS.length;
   $('#shopCount').textContent = list.length===total
-    ? `${total} fragrances · ${BRANDS.length} brands`
+    ? `${total} products · ${BRANDS.length} brands`
     : `Showing ${list.length} of ${total}`;
   $('#loadMore').hidden = visibleLimit >= list.length;
   $('#loadMore').textContent = `Discover More (${Math.max(0,list.length-visibleLimit)} remaining)`;
@@ -124,21 +126,21 @@ function observeReveals(){
 /* ── product modal ── */
 function openProduct(id){
   const p = byId(id); if(!p) return;
-  pmProduct = p; pmSize = '5ml';
+  pmProduct = p; const options=optionsOf(p);pmSize=options.find(v=>v.id==='5ml'&&v.inStock)?.id||options.find(v=>v.inStock)?.id||options[0].id;
   $('#pmEyebrow').textContent = famLabel(p);
   $('#pmName').textContent = p.name;
   $('#pmMono').textContent = p.mono;
   const pmImg = $('#pmImg');
-  pmImg.src = brandImg(p); pmImg.alt = `Representative ${p.brand} AI demo styling`;
+  pmImg.src = brandImg(p); pmImg.alt = p.name;
   pmImg.style.display = ''; pmImg.onerror = ()=>{ pmImg.style.display='none'; };
-  $('#pmDesc').textContent = (p.blurb || 'Explore this fragrance in a hand-poured decant.') + ' Explore a little before committing to more.';
+  $('#pmDesc').textContent = p.blurb || (categoryOf(p)==='Fragrance'?'Explore this fragrance in a discovery size.':'Discover the details and choose your preferred option.');
   $('#pmBadges').innerHTML = (p.badges || []).map(b=>`<span class="pm-badge">✦ ${b}</span>`).join('') +
     `<span class="pm-badge demo">demo price</span>`;
-  $('#pmSizes').innerHTML = SIZES.map(s=>
-    `<button data-size="${s.id}" class="${s.id===pmSize?'active':''}">${s.label}<small>${s.sub} · ${money(p.prices[s.id])}</small></button>`).join('');
+  $('#pmSizes').innerHTML = options.map(s=>
+    `<button data-size="${esc(s.id)}" ${s.inStock?'':'disabled'} class="${s.id===pmSize?'active':''}">${esc(s.label)}<small>${s.inStock?money(p.prices[s.id]):'Unavailable'}</small></button>`).join('');
   $('#pmPrice').textContent = money(p.prices[pmSize]);
   const addBtn = $('#pmAdd');
-  if(!p.inStock){
+  if(!p.inStock||!options.some(v=>v.inStock)){
     addBtn.disabled = true;
     addBtn.textContent = 'Out of Stock';
   } else {
@@ -159,6 +161,7 @@ function addToCart(name, detail, price, productId = null, size = null, extra = {
   renderCart(); toast(`Added to your bag — ${name}`);
 }
 function syncCart(){
+  cart=cart.filter(it=>!it.productId||(byId(it.productId)&&optionsOf(byId(it.productId)).some(v=>v.id===it.size&&v.inStock)));
   cart = cart.filter(it => !it.productId || byId(it.productId)?.inStock);
   cart.forEach(it => { if(it.productId && it.size) it.price = byId(it.productId).prices[it.size]; });
 }
@@ -168,7 +171,7 @@ function renderCart(){
   $('#cartCount').textContent = cart.reduce((n,it)=>n+it.qty,0);
   $('#checkoutBtn').disabled = !cart.length;
   $('#cartItems').innerHTML = cart.length ? cart.map((it,i)=>`
-    <div class="cart-item"><div class="ci-info"><strong>${esc(it.name)}</strong><small>${esc(it.detail)}</small><div class="quantity"><button data-qty="${i}" data-delta="-1" aria-label="Decrease quantity for ${esc(it.name)}">−</button><span>${it.qty}</span><button data-qty="${i}" data-delta="1" aria-label="Increase quantity for ${esc(it.name)}">+</button></div></div><span class="ci-price">${money(it.price*it.qty)}</span><button class="ci-rm" data-rm="${i}" aria-label="Remove ${esc(it.name)}">✕</button></div>`).join('') : '<div class="cart-empty"><p class="eyebrow">A little curiosity goes a long way.</p><h3>Your discovery starts here.</h3><p>Your bag is waiting for its first fragrance.</p><button class="btn btn-gold" data-close>Explore the Collection</button></div>';
+    <div class="cart-item"><div class="ci-info"><strong>${esc(it.name)}</strong><small>${esc(it.detail)}</small><div class="quantity"><button data-qty="${i}" data-delta="-1" aria-label="Decrease quantity for ${esc(it.name)}">−</button><span>${it.qty}</span><button data-qty="${i}" data-delta="1" aria-label="Increase quantity for ${esc(it.name)}">+</button></div></div><span class="ci-price">${money(it.price*it.qty)}</span><button class="ci-rm" data-rm="${i}" aria-label="Remove ${esc(it.name)}">✕</button></div>`).join('') : '<div class="cart-empty"><p class="eyebrow">A little curiosity goes a long way.</p><h3>Your discovery starts here.</h3><p>Your bag is waiting for its first discovery.</p><button class="btn btn-gold" data-close>Explore the Collection</button></div>';
   $('#cartTotal').textContent = money(cart.reduce((a,b)=>a+b.price*b.qty,0));
 }
 function toast(msg){
@@ -179,8 +182,7 @@ function toast(msg){
 /* ── mix builder ── */
 function mixList(){
   const q = mixSearch.trim().toLowerCase();
-  if(!q) return PRODUCTS.filter(p=>p.inStock);
-  return PRODUCTS.filter(p=>p.inStock && (p.name.toLowerCase().includes(q)||p.brand.toLowerCase().includes(q)));
+  return PRODUCTS.filter(p=>p.inStock && categoryOf(p)==='Fragrance' && !p.variants && (!q||p.name.toLowerCase().includes(q)||p.brand.toLowerCase().includes(q)));
 }
 function renderMixPicks(){
   const list = mixList();
@@ -240,7 +242,7 @@ document.addEventListener('click', e=>{
     document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active')); chip.classList.add('active');
     activeBrand = chip.dataset.brand; visibleLimit = 24; renderShop(); return; }
 });
-$('#pmAdd').onclick = ()=>{ if(!pmProduct || !pmProduct.inStock) return; const s = SIZES.find(x=>x.id===pmSize);
+$('#pmAdd').onclick = ()=>{ if(!pmProduct || !pmProduct.inStock) return; const s = optionsOf(pmProduct).find(x=>x.id===pmSize);if(!s?.inStock)return;
   addToCart(pmProduct.name, `${pmProduct.brand} · ${s.label} · demo price`, pmProduct.prices[pmSize], pmProduct.id, pmSize); closeModal(); openCart(); };
 $('#cartBtn').onclick = ()=>openCart();
 $('#checkoutBtn').onclick = ()=>openCheckout();
