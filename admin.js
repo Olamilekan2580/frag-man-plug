@@ -7,7 +7,7 @@ const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>
 const money = n => '$' + n;
 
 /* ── persisted state ── */
-const load = (k, fb) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? fb; } catch(e){ return fb; } };
+const load = (k, fb) => { if(Store.server) return fb; try { const v = JSON.parse(localStorage.getItem(k)); return v ?? fb; } catch(e){ return fb; } };
 const save = (k, v) => localStorage.setItem(k, JSON.stringify(v));
 
 let priceOverrides = load('fmp_price_overrides', {});   // {productId: {'3ml':n,'5ml':n,'10ml':n}}
@@ -17,7 +17,7 @@ let settings       = load('fmp_settings', null);
 
 const effPrice = (p, size) => (priceOverrides[p.id] && priceOverrides[p.id][size] != null)
   ? priceOverrides[p.id][size] : p.prices[size];
-const inStock = p => stockMap[p.id] !== false;
+const inStock = p => Store.server ? p.inStock !== false : (stockMap[p.id] ?? p.inStock) !== false;
 
 /* ── toast ── */
 function toast(msg){
@@ -53,16 +53,17 @@ function renderProducts(){
   $('#productRows').innerHTML = list.map(p=>{
     const stock = inStock(p);
     return `<tr data-row="${p.id}" class="${stock?'':'oos-row'}">
-      <td class="pname">${esc(p.name)}${p.line?`<small>${esc(p.line)}</small>`:''}</td>
+      <td class="pname"><button class="product-name-button" data-product-action="view" data-pid="${p.id}">${esc(p.name)}</button>${p.line?`<small>${esc(p.line)}</small>`:''}</td>
       <td>${esc(p.brand)}</td>
       ${['3ml','5ml','10ml'].map(s=>
-        `<td class="num"><input type="number" min="1" step="0.01" class="price-in" data-pid="${p.id}" data-size="${s}" value="${effPrice(p,s)}" aria-label="${esc(p.name)} ${s} price"></td>`
+        `<td class="num" data-label="${s} USD"><input type="number" min="1" step="0.01" class="price-in" data-pid="${p.id}" data-size="${s}" value="${effPrice(p,s)}" aria-label="${esc(p.name)} ${s} price"></td>`
       ).join('')}
       <td><button class="stock-toggle ${stock?'on':''}" data-stock="${p.id}" aria-pressed="${stock}">
         <span class="knob"></span><span class="st-label">${stock?'In stock':'Out of stock'}</span>
       </button></td>
+      <td><div class="row-actions"><button data-product-action="view" data-pid="${p.id}">View</button><button data-product-action="edit" data-pid="${p.id}">Edit</button><button class="delete-action" data-product-action="delete" data-pid="${p.id}">Delete</button></div></td>
     </tr>`;
-  }).join('') || `<tr><td colspan="6" class="muted" style="text-align:center;padding:2rem">No products match.</td></tr>`;
+  }).join('') || `<tr><td colspan="7" class="muted" style="text-align:center;padding:2rem">No products match.</td></tr>`;
   $('#adminCount').textContent = `Showing ${list.length} of ${PRODUCTS.length}`;
   $('#tabProductCount').textContent = PRODUCTS.length;
 }
@@ -95,8 +96,6 @@ document.addEventListener('click', e=>{
   if(t){
     const pid = t.dataset.stock;
     stockMap[pid] = !inStock(PRODUCTS.find(p=>p.id===pid));
-    if(stockMap[pid]) delete stockMap[pid]; // default is in-stock; keep map lean
-    else stockMap[pid] = false;
     save('fmp_stock', stockMap);
     renderProducts();
     toast(stockMap[pid]===false ? 'Marked out of stock' : 'Back in stock');
@@ -117,9 +116,10 @@ const SAMPLE_ORDERS = [
   {id:'FMP-1033', customer:'Tom H. · Chicago, IL', items:'Rasasi Hawas Ice (5ml) ×1', total:14, date:'2026-10-07'},
 ];
 const demoOrders = load('fmp_demo_orders', []);
-const ORDERS = [...(Array.isArray(demoOrders) ? demoOrders : []), ...SAMPLE_ORDERS];
+const deletedOrders = load('fmp_deleted_orders', []);
+const ORDERS = [...(Array.isArray(demoOrders) ? demoOrders : []), ...SAMPLE_ORDERS].filter(o=>!deletedOrders.includes(o.id));
 const STATUSES = ['Pending','Processing','Shipped','Delivered','Cancelled'];
-const oStatus = o => orderStatus[o.id] || (o.demo ? 'Pending' : o.id>='FMP-1041' ? 'Processing' : o.id>='FMP-1038' ? 'Shipped' : 'Delivered');
+const oStatus = o => o.status || orderStatus[o.id] || (o.demo ? 'Pending' : o.id>='FMP-1041' ? 'Processing' : o.id>='FMP-1038' ? 'Shipped' : 'Delivered');
 
 function renderOrderStats(){
   const rev = ORDERS.reduce((a,o)=>a+o.total,0);
@@ -141,6 +141,7 @@ function renderOrders(){
         ${STATUSES.map(s=>`<option ${s===oStatus(o)?'selected':''}>${s}</option>`).join('')}
       </select></td>
       <td>${o.date}</td>
+      <td><button class="delete-order-button" data-delete-order="${o.id}" aria-label="Delete demo order ${o.id}">Delete</button></td>
     </tr>`).join('');
   renderOrderStats();
 }
@@ -171,11 +172,11 @@ $('#settingsForm').addEventListener('submit', e=>{
   toast('Settings saved ✓');
 });
 $('#resetDemo').addEventListener('click', ()=>{
-  ['fmp_price_overrides','fmp_stock','fmp_order_status','fmp_settings','fmp_cart','fmp_demo_orders'].forEach(k=>localStorage.removeItem(k));
+  ['fmp_price_overrides','fmp_stock','fmp_order_status','fmp_settings','fmp_cart','fmp_demo_orders','fmp_catalog','fmp_deleted_orders'].forEach(k=>localStorage.removeItem(k));
   priceOverrides = {}; stockMap = {}; orderStatus = {}; settings = null;
   ORDERS.splice(0, ORDERS.length, ...SAMPLE_ORDERS);
   renderProducts(); renderOrders(); renderSettings();
-  toast('Demo data reset');
+  toast('Demo data reset'); location.reload();
 });
 
 /* ── init ── */

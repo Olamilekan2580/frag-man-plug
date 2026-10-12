@@ -1,6 +1,6 @@
 # The Frag Man Plug
 
-A responsive fragrance storefront demo for Jonathan Castellanos. The current demo uses HTML, CSS and browser JavaScript; React, Node.js, Stripe and a database are future production work, not connected integrations.
+A responsive fragrance storefront for Jonathan Castellanos, with an HTML/CSS/JavaScript frontend and an optional Node/SQLite backend. Stripe and production payment fulfillment remain disconnected. See [RENDER-SETUP.md](RENDER-SETUP.md) to create the server-backed free Render demo selected by the user.
 
 ## Preview
 
@@ -16,14 +16,18 @@ Open `http://localhost:4173`. Owner preview: `http://localhost:4173/admin.html`.
 - 215 catalog entries across 23 brand groups, search, brand filters, sorting and progressive loading.
 - 3ml, 5ml and 10ml size selection; persistent cart, quantities and removal.
 - Two-scent hybrid preview and a demo checkout with local confirmation.
-- Separate admin preview for prices, stock, orders and storefront settings.
+- Complete product creation, detail viewing, editing and deletion, including brand, collection, description, prices, availability and image uploads.
+- Separate admin for products, demo orders and storefront settings. Node mode uses authenticated API writes and shared SQLite records; static mode remains a clearly labeled browser-only preview.
+- Demo order creation, status updates and confirmed deletion.
 - Responsive storefront and owner interface; keyboard navigation, dialog focus trapping, reduced-motion support.
 - Optimized WebP brand styling and locally served Google Fonts with their SIL Open Font Licenses.
 - 215 individually named catalog artworks composed from the existing 23 AI brand images, with consistent cream/brass framing and fragrance titles. These are product-specific compositions, not 215 newly generated photographs or verified retail packaging.
 
 ## Demo boundaries
 
-Prices, shipping estimates, sample orders and availability are illustrative. Images are AI-generated brand styling, not verified photographs of exact fragrances. No payments, emails or shipments are created. Demo checkout saves item summaries in the current browser without retaining the submitted customer name/email. Admin changes persist in this browser only and apply when returning to or refreshing the storefront. The admin preview is public and has no authentication; production requires server-side authorization and persistence.
+Prices, shipping estimates, sample orders and availability are illustrative. Images are AI-generated brand styling, not verified photographs of exact fragrances. No payments, emails or shipments are created. Demo checkout retains no submitted customer name/email. Static mode saves catalog changes and demo orders in the current browser. Node mode saves shared products, settings and demo orders in SQLite and protects owner mutations with password login, HTTP-only session cookies, same-origin write checks and server validation. Prices and stock are checked again by the backend during demo checkout.
+
+The existing static Render site is not the Node service. The user chose to create a separate free Node web service in the Render dashboard. Free Render filesystem changes may disappear on restarts/redeploys; this is an accepted temporary demo limitation. Local SQLite storage survives local server restarts. Durable production database/upload storage still needs configuration before launch.
 
 Rebuild the individual catalog artwork with `python3 prepare-product-art.py` (requires Pillow and Node.js). Image paths are recorded in `product-images.js`, and the resulting assets live in `images/products/`. This compositor uses existing imagery and calls no image-generation API.
 
@@ -38,10 +42,12 @@ node --check app.js
 node --check experience.js
 node --check admin.js
 python3 test-demo.py
+node test-api.mjs
+python3 test-crud-layout.py
 ```
 
-The browser checks require Python Playwright and Chromium and start their own local server. They cover search/reset/pagination, persistent cart/quantities, demo checkout, hybrids, admin price/stock propagation, image responses, mobile navigation and storefront/admin overflow at 320, 375, 390, 480, 768, 820, 1024, 1440 and 1920 pixels.
+The browser checks require Python Playwright and Chromium and start their own local server. They cover search/reset/pagination, persistent cart/quantities, demo checkout, hybrids, admin price/stock propagation, image responses and mobile navigation. CRUD/layout tests additionally cover both static and Node modes, uploads, cross-browser visibility, confirmed/cancelled deletion, server-backed demo orders, and vertical group overlap, scrolling list containment and expanded FAQ answers at ten viewport widths. The hybrid picker lists are constrained scrolling containers, preventing rows from spilling into later sections.
 
 ## Hosting
 
-Render can publish the repository root as a static site with no build command. Connect the `main` branch for automatic deployment. Production hosting, client GitHub ownership transfer, real pricing, logo, payment provider, database, authentication and policies remain to be finalized.
+The current static Render service publishes the repository root. The separate Node service uses `npm start` and the free settings in `render.yaml`; follow [RENDER-SETUP.md](RENDER-SETUP.md). Client GitHub ownership transfer, real pricing, logo, payment provider, durable production storage and final policies remain to be finalized.

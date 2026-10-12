@@ -12,16 +12,16 @@ const BRANDS = [...new Set(PRODUCTS.map(p=>p.brand))].sort();
 const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
 const BRAND_IMG = {};
 BRANDS.forEach(b => { BRAND_IMG[b] = 'images/brand-' + slug(b) + '.webp'; });
-const brandImg = p => (typeof PRODUCT_IMAGES !== 'undefined' && PRODUCT_IMAGES[p.id]) || BRAND_IMG[p.brand] || '';
+const brandImg = p => p.image || (typeof PRODUCT_IMAGES !== 'undefined' && PRODUCT_IMAGES[p.id]) || BRAND_IMG[p.brand] || '';
 
 /* admin overrides (demo) — prices/stock edited in admin.html persist here */
 (function applyAdminOverrides(){
   try{
-    const po = JSON.parse(localStorage.getItem('fmp_price_overrides')||'{}');
+    const po = Store.server ? {} : JSON.parse(localStorage.getItem('fmp_price_overrides')||'{}');
     const sm = JSON.parse(localStorage.getItem('fmp_stock')||'{}');
     PRODUCTS.forEach(p=>{
       if(po[p.id]) p.prices = Object.assign({}, p.prices, po[p.id]);
-      p.inStock = sm[p.id] !== false;
+      p.inStock = Store.server ? p.inStock !== false : (sm[p.id] ?? p.inStock) !== false;
     });
   }catch(e){ /* corrupted storage — fall back to defaults */ }
 })();
@@ -54,7 +54,7 @@ function cardHTML(p){
   return `<article class="card reveal${oos?' oos':''}" data-card="${p.id}">
     <div class="card-visual">
       <div class="mono-tile" aria-hidden="true">${esc(p.mono)}</div>
-      <img class="card-img" src="${brandImg(p)}" alt="${esc(p.name)} — catalog artwork using representative AI brand imagery" width="560" height="700" loading="lazy" decoding="async" onerror="this.style.display='none'">
+      <img class="card-img" src="${esc(brandImg(p))}" alt="${esc(p.name)} — catalog artwork using representative AI brand imagery" width="560" height="700" loading="lazy" decoding="async" onerror="this.style.display='none'">
       ${oos?'<span class="oos-tag">Out of stock</span>':''}
     </div>
     <div class="card-body">
@@ -105,7 +105,7 @@ function renderBrandChips(){
 
 function renderFeatured(){
   const picks = FEATURED_IDS.map(byId).filter(Boolean);
-  while(picks.length<4) picks.push(PRODUCTS[picks.length]);
+  for(const p of PRODUCTS) if(picks.length<4 && !picks.some(x=>x.id===p.id)) picks.push(p);
   $('#featuredGrid').innerHTML = picks.slice(0,4).map(cardHTML).join('');
 }
 
@@ -127,8 +127,8 @@ function openProduct(id){
   const pmImg = $('#pmImg');
   pmImg.src = brandImg(p); pmImg.alt = `Representative ${p.brand} AI demo styling`;
   pmImg.style.display = ''; pmImg.onerror = ()=>{ pmImg.style.display='none'; };
-  $('#pmDesc').textContent = p.blurb + ' Available as a hand-poured decant from Florida. Explore a little before committing to more.';
-  $('#pmBadges').innerHTML = p.badges.map(b=>`<span class="pm-badge">✦ ${b}</span>`).join('') +
+  $('#pmDesc').textContent = (p.blurb || 'Explore this fragrance in a hand-poured decant.') + ' Available as a hand-poured decant from Florida. Explore a little before committing to more.';
+  $('#pmBadges').innerHTML = (p.badges || []).map(b=>`<span class="pm-badge">✦ ${b}</span>`).join('') +
     `<span class="pm-badge demo">demo price</span>`;
   $('#pmSizes').innerHTML = SIZES.map(s=>
     `<button data-size="${s.id}" class="${s.id===pmSize?'active':''}">${s.label}<small>${s.sub} · ${money(p.prices[s.id])}</small></button>`).join('');
@@ -148,10 +148,10 @@ function openProduct(id){
 function closeModal(){ $('#productModal').hidden = true; document.body.style.overflow = ''; }
 
 /* ── cart ── */
-function addToCart(name, detail, price, productId = null, size = null){
+function addToCart(name, detail, price, productId = null, size = null, extra = {}){
   const existing = cart.find(it => it.name === name && it.detail === detail);
   if(existing) existing.qty = Math.min(99, existing.qty + 1);
-  else cart.push({name, detail, price, qty:1, productId, size});
+  else cart.push({name, detail, price, qty:1, productId, size, ...extra});
   renderCart(); toast(`Added to your bag — ${name}`);
 }
 function syncCart(){
@@ -200,7 +200,7 @@ function updateMix(){
     $('#mixDesc').textContent = `${mixRatio} — ${b.name} leading, ${a.name} weaving through. Your custom blend preview.`;
     $('#mixPrice').textContent = `${mixSize.s} · ${money(mixSize.p)}`;
     btn.disabled = false;
-    btn.onclick = ()=>addToCart('Custom Hybrid Mix', `${name} · ${mixRatio} · ${mixSize.s} · demo price`, mixSize.p);
+    btn.onclick = ()=>addToCart('Custom Hybrid Mix', `${name} · ${mixRatio} · ${mixSize.s} · demo price`, mixSize.p, null, mixSize.s, {baseId:b.id,accentId:a.id,ratio:mixRatio});
   } else {
     $('#mixName').textContent = 'Select a base & accent';
     $('#mixDesc').textContent = 'Pick two different fragrances above to preview your hybrid.';

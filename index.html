@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="refinement.css">
 <link rel="stylesheet" href="luxury.css">
+<link rel="stylesheet" href="layout-fixes.css">
 </head>
 <body>
 <a class="skip-link" href="#shop">Skip to collection</a>
@@ -316,6 +317,7 @@
 <div class="modal checkout-modal" id="checkoutModal" role="dialog" aria-modal="true" aria-labelledby="checkoutTitle" hidden><div class="checkout-card"><button class="modal-x" data-close aria-label="Close checkout">✕</button><div id="checkoutContent"><p class="eyebrow">One last look</p><h2 id="checkoutTitle">Your discovery awaits.</h2><p class="muted">Demo checkout. Use sample details only. No payment or shipment.</p><form id="checkoutForm"><div class="checkout-fields"><label>Name<input name="customer" required maxlength="80" placeholder="Demo Customer" autocomplete="off"></label><label>Email<input name="email" type="email" required placeholder="demo@example.com" autocomplete="off"></label><label>Delivery state<select name="state" required><option value="">Choose a US state</option></select></label></div><div id="checkoutSummary"></div><p class="demo-note">All amounts are illustrative. Taxes, final shipping rules and real payments are not connected.</p><button class="btn btn-gold full" type="submit">Place Demo Order ↗</button><button class="text-button" id="backToCart" type="button">← Back to your bag</button></form></div><div id="checkoutSuccess" hidden><p class="eyebrow">Demo complete</p><h2>Your next scent is calling.</h2><p id="orderConfirmation"></p><p class="muted">This demonstration is saved in this browser’s admin preview. No payment, email or shipment was created.</p><button class="btn btn-gold" data-close>Keep Exploring</button></div></div></div><div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="products.js"></script>
+<script src="catalog-store.js"></script>
 <script src="product-images.js"></script>
 <script src="app.js"></script>
 <script src="experience.js"></script>

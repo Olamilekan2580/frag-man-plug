@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: frag-man-plug-store
+    runtime: node
+    plan: free
+    buildCommand: node --check server.mjs
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: HOST
+        value: "0.0.0.0"
+      - key: ADMIN_PASSWORD
+        sync: false
+# Free demo: SQLite and uploaded files reset on Render restarts/redeploys.
+# No paid service or disk is provisioned by this blueprint.
