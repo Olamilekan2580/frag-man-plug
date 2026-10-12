@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import {DatabaseSync} from 'node:sqlite';
+import {createSupplierSync} from './supplier-sync.mjs';
+const db=new DatabaseSync(':memory:');db.exec('CREATE TABLE products(id TEXT PRIMARY KEY,document TEXT NOT NULL)');
+const product={id:'shirt',name:'Linen shirt',inStock:false,supplier:{provider:'cj',productId:'CJ-shirt'},prices:{M:45,L:48},variants:[{id:'M',label:'Medium',inStock:false},{id:'L',label:'Large',inStock:true}]};
+const put=p=>db.prepare('INSERT INTO products VALUES(?,?) ON CONFLICT(id) DO UPDATE SET document=excluded.document').run(p.id,JSON.stringify(p));const get=()=>JSON.parse(db.prepare('SELECT document FROM products WHERE id=?').get('shirt').document);put(product);
+let clock=1000000,calls=0,fail=false;
+const cj={configured:true,async variant(id){calls++;if(fail)throw new Error('upstream error');return {cost:id==='M'?20:25,quantity:id==='M'?7:0};}};
+let sync=createSupplierSync({db,cj,now:()=>clock});assert.equal(sync.config().enabled,false);assert.equal(sync.config().autoPrice,false);const first=sync.enqueue();assert.equal(sync.enqueue().id,first.id);await Promise.all([sync.run(),sync.run()]);assert.equal(calls,2);assert.equal(get().inStock,false,'stock sync must not publish a draft');assert.equal(get().variants[0].inStock,true);assert.equal(get().variants[1].inStock,false);assert.equal(get().prices.M,45);assert.equal(get().supplierSync.status,'synced');assert.equal(sync.jobs()[0].state,'done');
+sync.configure({enabled:true,intervalMinutes:30,autoPrice:true,markup:100});clock+=2000000;sync.enqueue();await sync.run();assert.equal(get().prices.M,40);assert.equal(get().prices.L,50);
+fail=true;clock+=2000000;sync.enqueue();await sync.run();assert.equal(sync.jobs()[0].state,'retry');assert.equal(get().supplierSync.status,'needs_attention');assert.ok(get().variants.every(v=>!v.inStock));assert.equal(get().prices.M,40);assert.equal(sync.enqueue().id,sync.jobs()[0].id);
+clock+=100000;await sync.run();clock+=200000;await sync.run();assert.equal(sync.jobs()[0].state,'failed');assert.equal(sync.jobs()[0].attempts,3);
+fail=false;clock+=2000000;const recovered=sync.enqueue();db.prepare('UPDATE supplier_jobs SET document=? WHERE id=?').run(JSON.stringify({...recovered,state:'running'}),recovered.id);sync=createSupplierSync({db,cj,now:()=>clock});assert.equal(sync.jobs()[0].state,'queued');await sync.run();assert.equal(sync.jobs()[0].state,'done');
+assert.throws(()=>sync.configure({enabled:true,intervalMinutes:1,autoPrice:true,markup:100}),e=>e.status===422);
+const count=sync.jobs().length;await sync.tick();assert.equal(sync.jobs().length,count);clock+=2000000;await sync.tick();assert.equal(sync.jobs().length,count+1);assert.equal(sync.jobs()[0].state,'done');sync.configure({enabled:false,intervalMinutes:30,autoPrice:false,markup:100});clock+=2000000;await sync.tick();assert.equal(sync.jobs().length,count+1);
+const edited=createSupplierSync({db,cj:{configured:true,async variant(id){const p=get();p.prices.M=99;p.name='Owner edited name';put(p);return {cost:20,quantity:5};}},now:()=>clock});edited.enqueue();await edited.run();assert.equal(get().prices.M,99);assert.equal(get().name,'Owner edited name');
+const missing=createSupplierSync({db,cj:{configured:false},now:()=>clock});assert.throws(()=>missing.enqueue(),e=>e.status===503);assert.throws(()=>missing.configure({enabled:true,intervalMinutes:60,autoPrice:false,markup:100}),e=>e.status===503);
+db.close();console.log('PASS: default-off automation, job deduplication, single worker, US-stock update, draft stays unpublished, opt-in price updates, failure pauses options, bounded retries, restart recovery, missing credentials.');

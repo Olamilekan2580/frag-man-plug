@@ -22,6 +22,7 @@ const brandImg = p => p.image || (typeof PRODUCT_IMAGES !== 'undefined' && PRODU
     PRODUCTS.forEach(p=>{
       if(po[p.id]) p.prices = Object.assign({}, p.prices, po[p.id]);
       p.inStock = Store.server ? p.inStock !== false : (sm[p.id] ?? p.inStock) !== false;
+      if(p.supplier&&(p.supplierSync?.status!=='synced'||p.supplierSync.staleAfter<Date.now()))p.inStock=false;
     });
   }catch(e){ /* corrupted storage — fall back to defaults */ }
 })();

@@ -6,6 +6,8 @@ Current release: VEGArance identity, ink/plum and ivory palette, responsive cata
 
 Lifestyle expansion adds Fragrance, Beauty, Fashion, Accessories and Home category browsing, arbitrary size/color options with individual availability and prices, and an owner-only CJ catalog search/draft connector for the United States. See [CJ-SETUP.md](CJ-SETUP.md) to configure `CJ_API_KEY` privately on Render. Supplier orders are not yet automated; preview checkout remains active. New category collections display honest empty states until products are approved.
 
+CJ stock/cost sync now supports owner-controlled scheduling, opt-in price updates, manual runs, persisted job history, retries and interrupted-job recovery. Missing or stale supplier checks block checkout. Automation defaults off and does not purchase supplier orders. Free Render sleeping/reset behavior prevents reliable continuous operation until durable hosting is configured. Run `node test-sync.mjs` and `node test-cj.mjs` for mocked worker/provider checks, plus `npm run test:api` and `python3 test-crud-layout.py` for API/browser validation.
+
 Before taking real orders: confirm sellable inventory and prices, country/currency and fulfillment policies; connect a payment account and verified webhook; use durable database/upload storage; add transactional email and real shipping/tax rules. The existing free Render filesystem may reset.
 
 ## Technical reference

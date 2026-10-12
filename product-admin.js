@@ -79,10 +79,10 @@ async function ownerSession(){
  document.querySelector('.admin-notice').textContent='Server-backed owner panel. Product changes are stored in the database and shared with storefront visitors. Checkout remains a demonstration; no payments are processed.';
  try{const session=await Store.request('/api/session');if(!session.authenticated){$('#ownerLogin').showModal();if(!session.configured)$('#loginError').textContent='The server owner must configure ADMIN_PASSWORD before login.';return;}settings=await Store.request('/api/settings');if(!Object.keys(settings).length)settings=null;renderSettings();const orders=await Store.request('/api/orders');ORDERS.splice(0,ORDERS.length,...orders);renderOrders();}catch(error){toast(error.message);}
 }
-$('#ownerLoginForm').addEventListener('submit',async e=>{e.preventDefault();$('#loginError').textContent='';$('#ownerLoginSubmit').disabled=true;try{await Store.request('/api/login','POST',{password:$('#ownerPassword').value});$('#ownerPassword').value='';$('#ownerLogin').close();await ownerSession();}catch(error){$('#loginError').textContent=error.message;}finally{$('#ownerLoginSubmit').disabled=false;}});
+$('#ownerLoginForm').addEventListener('submit',async e=>{e.preventDefault();$('#loginError').textContent='';$('#ownerLoginSubmit').disabled=true;try{await Store.request('/api/login','POST',{password:$('#ownerPassword').value});$('#ownerPassword').value='';$('#ownerLogin').close();await ownerSession();document.dispatchEvent(new Event('owner-authenticated'));}catch(error){$('#loginError').textContent=error.message;}finally{$('#ownerLoginSubmit').disabled=false;}});
 $('#ownerLogin').addEventListener('cancel',e=>e.preventDefault());
 $('#logoutOwner').onclick=async()=>{try{await Store.request('/api/logout','POST');await ownerSession();}catch(error){toast(error.message);}};
-ownerSession();
+ownerSession().then(()=>{if(!$('#ownerLogin').open)document.dispatchEvent(new Event('owner-authenticated'));});
 let pendingOrderDelete=null;
 $('#cancelOrderDelete').onclick=()=>$('#deleteOrderDialog').close();
 $('#confirmOrderDelete').onclick=async()=>{
