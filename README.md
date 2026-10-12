@@ -19,10 +19,13 @@ Open `http://localhost:4173`. Owner preview: `http://localhost:4173/admin.html`.
 - Separate admin preview for prices, stock, orders and storefront settings.
 - Responsive storefront and owner interface; keyboard navigation, dialog focus trapping, reduced-motion support.
 - Optimized WebP brand styling and locally served Google Fonts with their SIL Open Font Licenses.
+- 215 individually named catalog artworks composed from the existing 23 AI brand images, with consistent cream/brass framing and fragrance titles. These are product-specific compositions, not 215 newly generated photographs or verified retail packaging.
 
 ## Demo boundaries
 
 Prices, shipping estimates, sample orders and availability are illustrative. Images are AI-generated brand styling, not verified photographs of exact fragrances. No payments, emails or shipments are created. Demo checkout saves item summaries in the current browser without retaining the submitted customer name/email. Admin changes persist in this browser only and apply when returning to or refreshing the storefront. The admin preview is public and has no authentication; production requires server-side authorization and persistence.
+
+Rebuild the individual catalog artwork with `python3 prepare-product-art.py` (requires Pillow and Node.js). Image paths are recorded in `product-images.js`, and the resulting assets live in `images/products/`. This compositor uses existing imagery and calls no image-generation API.
 
 Full bottles and future candle, soap and body collections need confirmed product information before launch. New arrivals have not been identified, so the demo includes a decant size guide instead of invented arrivals. Unsupported reviews, customer ratings, delivery guarantees and return terms have been removed.
 

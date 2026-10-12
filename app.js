@@ -12,7 +12,7 @@ const BRANDS = [...new Set(PRODUCTS.map(p=>p.brand))].sort();
 const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
 const BRAND_IMG = {};
 BRANDS.forEach(b => { BRAND_IMG[b] = 'images/brand-' + slug(b) + '.webp'; });
-const brandImg = p => BRAND_IMG[p.brand] || '';
+const brandImg = p => (typeof PRODUCT_IMAGES !== 'undefined' && PRODUCT_IMAGES[p.id]) || BRAND_IMG[p.brand] || '';
 
 /* admin overrides (demo) — prices/stock edited in admin.html persist here */
 (function applyAdminOverrides(){
@@ -54,14 +54,13 @@ function cardHTML(p){
   return `<article class="card reveal${oos?' oos':''}" data-card="${p.id}">
     <div class="card-visual">
       <div class="mono-tile" aria-hidden="true">${esc(p.mono)}</div>
-      <img class="card-img" src="${brandImg(p)}" alt="Representative ${esc(p.brand)} demo imagery" loading="lazy" onerror="this.style.display='none'">
-      <span class="demo-tag">demo price</span>
+      <img class="card-img" src="${brandImg(p)}" alt="${esc(p.name)} — catalog artwork using representative AI brand imagery" width="560" height="700" loading="lazy" decoding="async" onerror="this.style.display='none'">
       ${oos?'<span class="oos-tag">Out of stock</span>':''}
     </div>
     <div class="card-body">
       <p class="card-family">${esc(famLabel(p).toUpperCase())}</p>
       <h3>${esc(p.name)}</h3>
-      <p class="card-notes">${esc(p.blurb)}</p>
+      <p class="card-notes">Hand-poured in Florida · 3ml / 5ml / 10ml</p>
       <div class="card-foot">
         <span class="card-price">${money(p.prices['3ml'])}<small>3ml decant · demo price</small></span>
         <button class="card-btn" data-view="${p.id}" aria-label="Choose size for ${esc(p.name)}">Choose size ↗</button>
