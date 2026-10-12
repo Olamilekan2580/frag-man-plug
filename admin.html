@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
 <title>Store Admin — The Frag Man Plug (Demo)</title>
 <meta name="robots" content="noindex, nofollow">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="fonts.css">
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="refinement.css">
 </head>
 <body class="admin-body">
 
@@ -21,7 +21,7 @@
     </div>
     <a class="btn btn-ghost btn-sm" href="index.html">← Back to Store</a>
   </div>
-  <p class="admin-notice">Demo admin panel — in the real build this page is password-protected and completely invisible to customers. Changes you make here are saved in this browser and reflected on the storefront instantly.</p>
+  <p class="admin-notice">Demo admin panel — in the real build this page is password-protected and restricted to authorized owners. Changes you make here are saved in this browser and reflected when you return to or refresh the storefront. No server, authentication, real payments or customer notifications are connected.</p>
 </header>
 
 <nav class="admin-tabs" role="tablist">
@@ -63,7 +63,7 @@
         <tbody id="orderRows"></tbody>
       </table>
     </div>
-    <p class="admin-hint">Mock orders for the demo — in the real build these arrive live from checkout, with customer emails and tracking numbers.</p>
+    <p class="admin-hint">Sample orders and locally placed demo orders — in the real build these arrive live from checkout, with customer emails and tracking numbers.</p>
   </section>
 
   <!-- ══════════ SETTINGS ══════════ -->
@@ -95,7 +95,7 @@
   <p>The Frag Man Plug — demo admin · <a href="index.html">View storefront</a></p>
 </footer>
 
-<div class="toast" id="toast" hidden></div>
+<div class="toast" id="toast" role="status" hidden></div>
 
 <script src="products.js"></script>
 <script src="admin.js"></script>

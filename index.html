@@ -3,16 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
 <title>The Frag Man Plug — Authentic Fragrance Decants</title>
-<meta name="description" content="The Frag Man Plug — 215+ authentic Middle Eastern fragrances as hand-poured decants, full bottles and custom hybrid mixes. Poured fresh in Florida.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+<meta name="description" content="The Frag Man Plug — Authentic Middle Eastern and designer fragrances as hand-poured decants, full bottles and custom hybrid mixes. Poured fresh in Florida.">
+<link rel="stylesheet" href="fonts.css">
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="refinement.css">
 </head>
 <body>
+<a class="skip-link" href="#shop">Skip to collection</a>
 
-<div class="announce">✦ Complimentary US shipping on orders <b>$75+</b> &nbsp;·&nbsp; Hand-poured in Florida ✦</div>
+<div class="announce">THE FRAG MAN PLUG <span> / </span> HAND-POURED IN FLORIDA <span> / </span> DEMO PREVIEW · USD PLACEHOLDER PRICES</div>
 
 <!-- ══════════ NAV ══════════ -->
 <header class="nav" id="nav">
@@ -27,7 +28,7 @@
         <a href="#shop" class="drop-btn">Shop ▾</a>
         <div class="drop-menu">
           <a href="#shop">All Fragrances</a>
-          <a href="#new">New Arrivals</a>
+          <a href="#sizes">Find Your Size</a>
           <a href="#mix">Custom Hybrid Mix</a>
           <span class="drop-soon">Candles <em>soon</em></span>
           <span class="drop-soon">Soaps <em>soon</em></span>
@@ -40,7 +41,7 @@
     </nav>
     <div class="nav-actions">
       <button class="icon-btn" id="cartBtn" aria-label="Open cart">🛍 <span class="cart-count" id="cartCount">0</span></button>
-      <button class="icon-btn burger" id="burger" aria-label="Menu">☰</button>
+      <button class="icon-btn burger" id="burger" aria-label="Menu" aria-expanded="false" aria-controls="navLinks">☰</button>
     </div>
   </div>
 </header>
@@ -49,29 +50,29 @@
 <section class="hero" id="home">
   <div class="hero-inner">
     <div class="hero-content">
-      <p class="eyebrow">The Plug — Est. Florida, 2026</p>
-      <h1>215+ Authentic Scents.<br><span class="gold">Decanted For You.</span></h1>
-      <p class="hero-sub">Armaf, Lattafa, Rasasi, Afnan, Jo Milano Paris and 18 more houses — hand-poured into 3ml, 5ml and 10ml decants, plus full bottles and one-of-one custom hybrid mixes.</p>
+      <p class="eyebrow">Small vials. A whole world of fragrance.</p>
+      <h1>Your next signature.<br><span class="gold"><em>Find it here.</em></span></h1>
+      <p class="hero-sub">Explore the fragrances you’ve been curious about, without committing to a full bottle. Authentic scents. Hand-poured decants. Your kind of discovery.</p>
       <div class="hero-cta">
-        <a href="#shop" class="btn btn-gold">Shop the Collection</a>
-        <a href="#mix" class="btn btn-ghost">Build a Hybrid Mix</a>
+        <a href="#shop" class="btn btn-gold">Explore the Collection</a>
+        <a href="#mix" class="btn btn-ghost">Create Your Own Blend</a>
       </div>
       <div class="hero-badges">
         <span>✦ 100% authentic stock</span><span>✦ Poured fresh in Florida</span><span>✦ Ships across the US</span>
       </div>
     </div>
-    <div class="hero-visual">
-      <img class="hero-img" src="images/hero-flatlay.png" alt="Luxury fragrance flat-lay — The Frag Man Plug" onerror="this.style.display='none'">
-    </div>
+    <div class="hero-visual"><span class="visual-number">THE DISCOVERY EDIT / 01</span>
+      <img class="hero-img" src="images/hero-flatlay.webp" alt="AI-generated fragrance styling for the demo" onerror="this.style.display='none'">
+    <div class="hero-caption"><span>A little bottle.<br><b>A lasting impression.</b></span><span>3 / 5 / 10 ml</span></div></div>
   </div>
 </section>
 
 <!-- ══════════ TRUST BADGES ══════════ -->
 <div class="trust"><div class="trust-inner">
-  <div class="trust-item"><span class="ti">💧</span><div><strong>Hand-poured fresh</strong><small>Decanted to order, never pre-filled</small></div></div>
-  <div class="trust-item"><span class="ti">🛡️</span><div><strong>100% authentic</strong><small>Poured from sealed, verifiable stock</small></div></div>
-  <div class="trust-item"><span class="ti">✦</span><div><strong>23 brands</strong><small>215+ fragrances in the vault</small></div></div>
-  <div class="trust-item"><span class="ti">📦</span><div><strong>Ships in 48h</strong><small>Tracked US delivery</small></div></div>
+  <div class="trust-item"><span class="ti">💧</span><div><strong>Hand-poured fresh</strong><small>Small vials for big discoveries</small></div></div>
+  <div class="trust-item"><span class="ti">🛡️</span><div><strong>100% authentic</strong><small>Middle Eastern & designer fragrances</small></div></div>
+  <div class="trust-item"><span class="ti">✦</span><div><strong id="brandTotal">Brand collection</strong><small id="catalogTotal">Explore the vault</small></div></div>
+  <div class="trust-item"><span class="ti">📦</span><div><strong>Florida to your door</strong><small>Shipping across the US</small></div></div>
 </div></div>
 
 <!-- ══════════ MARQUEE ══════════ -->
@@ -83,12 +84,12 @@
 <!-- ══════════ FEATURED ══════════ -->
 <section class="section" id="featured">
   <div class="section-head">
-    <p class="eyebrow">The Icons</p>
-    <h2>Most <span class="gold">Wanted</span></h2>
-    <p class="section-sub">The heavy hitters — the scents everyone asks the plug for first.</p>
+    <p class="eyebrow">A good place to start</p>
+    <h2>Meet the <span class="gold"><em>collection.</em></span></h2>
+    <p class="section-sub">A few familiar names to begin your fragrance discovery.</p>
   </div>
   <div class="grid cards" id="featuredGrid"></div>
-  <div class="center"><a href="#shop" class="btn btn-ghost">Browse All 215+</a></div>
+  <div class="center"><a href="#shop" class="btn btn-ghost">Explore All Fragrances</a></div>
 </section>
 
 <!-- ══════════ SHOP ══════════ -->
@@ -99,30 +100,15 @@
     <p class="section-sub">Every scent available as a hand-poured decant — 3ml, 5ml or 10ml. Search the vault or filter by brand.</p>
   </div>
   <div class="search-row">
-    <input type="search" id="shopSearch" placeholder="Search 215+ fragrances — try 'Hawas', 'Asad', 'vanilla'… " aria-label="Search fragrances">
+    <input type="search" id="shopSearch" placeholder="Search a fragrance or brand…" aria-label="Search fragrances">
   </div>
-  <p class="shop-count" id="shopCount"></p>
+  <div class="catalog-toolbar"><p class="shop-count" id="shopCount" aria-live="polite"></p><label>Sort by <select id="shopSort"><option value="original">Collection order</option><option value="az">Name: A–Z</option><option value="price">Price: low to high</option></select></label></div>
   <div class="filters" id="brandChips"></div>
-  <div class="grid cards" id="shopGrid"></div>
+  <div class="grid cards" id="shopGrid"></div><div class="center"><button class="btn btn-ghost" id="loadMore">Discover More</button></div>
   <p class="demo-note">All prices are demo placeholders in USD — final pricing to be confirmed.</p>
 </div></section>
 
-<!-- ══════════ NEW ARRIVALS (placeholder) ══════════ -->
-<section class="section" id="new">
-  <div class="section-head">
-    <p class="eyebrow">Just Landed</p>
-    <h2>New <span class="gold">Arrivals</span></h2>
-    <p class="section-sub">Fresh stock just hit the vault — names are being added now. Check back soon.</p>
-  </div>
-  <div class="grid new-grid">
-    <div class="new-tile"><span class="new-q">?</span><p>New arrival</p><small>Name coming soon</small></div>
-    <div class="new-tile"><span class="new-q">?</span><p>New arrival</p><small>Name coming soon</small></div>
-    <div class="new-tile"><span class="new-q">?</span><p>New arrival</p><small>Name coming soon</small></div>
-    <div class="new-tile"><span class="new-q">?</span><p>New arrival</p><small>Name coming soon</small></div>
-    <div class="new-tile"><span class="new-q">?</span><p>New arrival</p><small>Name coming soon</small></div>
-    <div class="new-tile"><span class="new-q">?</span><p>New arrival</p><small>Name coming soon</small></div>
-  </div>
-</section>
+<section class="section size-guide" id="sizes"><div class="section-head"><p class="eyebrow">Start small. Discover more.</p><h2>A size for <span class="gold"><em>every curiosity.</em></span></h2><p class="section-sub">Same authentic fragrance. Three ways to make it yours.</p></div><div class="guide-grid"><article><span class="vial vial-small"></span><p class="eyebrow">The first impression</p><h3>3 ml</h3><p>A little introduction. Try a new scent before making it part of your rotation.</p><a href="#shop">Find your first scent ↗</a></article><article class="guide-highlight"><span class="vial vial-medium"></span><p class="eyebrow">The getting-to-know-you</p><h3>5 ml</h3><p>Room to explore. Wear it your way and see how it fits into your everyday.</p><a href="#shop">Explore the collection ↗</a></article><article><span class="vial vial-large"></span><p class="eyebrow">The new favorite</p><h3>10 ml</h3><p>Keep a favorite close. A portable addition to your fragrance wardrobe.</p><a href="#shop">Find your next favorite ↗</a></article></div></section>
 
 <!-- ══════════ CUSTOM HYBRID MIX ══════════ -->
 <section class="section tint" id="mix"><div class="wrap">
@@ -133,7 +119,7 @@
   </div>
   <div class="mix-builder">
     <div class="search-row mix-search-row">
-      <input type="search" id="mixSearch" placeholder="Type to filter 220 scents…" aria-label="Filter mix scents">
+      <input type="search" id="mixSearch" placeholder="Search available fragrances…" aria-label="Filter mix scents">
     </div>
     <p class="shop-count" id="mixCount"></p>
     <div class="mix-step">
@@ -176,9 +162,9 @@
 
 <!-- ══════════ PERKS ══════════ -->
 <div class="perks"><div class="perks-inner">
-  <div class="perk"><div class="pi">🚚</div><h4>Fast, Tracked Shipping</h4><p>Orders pour and ship within 48 hours. Free US shipping over $75 — flat $6.95 under.</p></div>
-  <div class="perk"><div class="pi">↩️</div><h4>30-Day Returns</h4><p>Unopened bottles come back, no questions. Decants are final sale — that's why 3ml tasters exist.</p></div>
-  <div class="perk"><div class="pi">🛡️</div><h4>Authenticity Guaranteed</h4><p>Every decant is poured from sealed, verifiable stock. Batch codes on every vial.</p></div>
+  <div class="perk"><div class="pi">🚚</div><h4>Fast, Tracked Shipping</h4><p>Hand-poured in Florida and shipped across the US. Demo shipping estimates are shown at checkout.</p></div>
+  <div class="perk"><div class="pi">↩️</div><h4>Thoughtful Discovery</h4><p>Start with a small decant before choosing your favorite. Final return policies will be published at launch.</p></div>
+  <div class="perk"><div class="pi">🛡️</div><h4>Authenticity Guaranteed</h4><p>Explore authentic branded fragrances, portioned into smaller vials for discovery.</p></div>
 </div></div>
 
 <!-- ══════════ COMING SOON ══════════ -->
@@ -192,45 +178,28 @@
     <div class="soon-card">
       <div class="soon-icon">🕯️</div>
       <h3>Luxury Candles</h3>
-      <p>Your favourite scents from the vault, poured into hand-finished candles with 55-hour burn times.</p>
+      <p>A new way to bring fragrance home. Collection details will be shared when ready.</p>
       <span class="soon-tag">In the lab</span>
     </div>
     <div class="soon-card">
       <div class="soon-icon">🧼</div>
       <h3>Artisan Soaps</h3>
-      <p>Cold-processed soaps layered with signature fragrance notes. Small batches, cured 6 weeks.</p>
+      <p>A future collection for your daily ritual. Product details are still to come.</p>
       <span class="soon-tag">In the lab</span>
     </div>
     <div class="soon-card">
       <div class="soon-icon">🧴</div>
       <h3>Body Collection</h3>
-      <p>Body oils, lotions and washes designed to layer with your scent and make it last all day.</p>
+      <p>More ways to enjoy fragrance, beyond the bottle. Discover the collection at launch.</p>
       <span class="soon-tag">In the lab</span>
     </div>
   </div>
   <form class="notify" id="notifyForm" novalidate>
-    <input type="email" id="notifyEmail" placeholder="Your email for launch alerts" required>
-    <button class="btn btn-gold" type="submit">Notify Me</button>
+    <input type="email" id="notifyEmail" aria-label="Email address" placeholder="Try the demo email signup" required>
+    <button class="btn btn-gold" type="submit">Preview Signup</button>
   </form>
-  <p class="notify-ok" id="notifyOk" hidden>✦ You're on the list. We'll be in touch.</p>
+  <p class="notify-ok" id="notifyOk" hidden>Demo signup preview complete. No email was sent or saved.</p>
 </section>
-
-<!-- ══════════ GALLERY ══════════ -->
-<section class="section gallery" id="culture"><div class="wrap">
-  <div class="section-head">
-    <p class="eyebrow">The Culture</p>
-    <h2>Worn by <span class="gold">the Bold</span></h2>
-    <p class="section-sub">Real rotations from the community. Tag <strong>@thefragmanplug</strong> to be featured.</p>
-  </div>
-  <div class="gal-grid">
-    <div class="gal-tile" data-mono="LA" style="--g1:#4a3319;--g2:#241708"><span>Lattafa Asad, date night approved<small>@marcus.mia</small></span></div>
-    <div class="gal-tile" data-mono="RH" style="--g1:#5c4a1e;--g2:#2c2410"><span>Rasasi Hawas = daily driver<small>@daily.scent</small></span></div>
-    <div class="gal-tile" data-mono="MIX" style="--g1:#3d2c14;--g2:#1c130a"><span>My hybrid mix: Hawas × Asad<small>@orlando.nose</small></span></div>
-    <div class="gal-tile" data-mono="CDN" style="--g1:#2c3d33;--g2:#14201a"><span>Club de Nuit Intense — beast mode<small>@tampa.bay</small></span></div>
-    <div class="gal-tile" data-mono="9PM" style="--g1:#54380f;--g2:#241a08"><span>Afnan 9pm. Compliments daily.<small>@fraghead.fl</small></span></div>
-    <div class="gal-tile" data-mono="GS" style="--g1:#4a2430;--g2:#200f14"><span>Game of Spade for the gala<small>@dani.r</small></span></div>
-  </div>
-</div></section>
 
 <!-- ══════════ STORY ══════════ -->
 <section class="section" id="story">
@@ -238,44 +207,26 @@
     <div class="story-text">
       <p class="eyebrow">Our Story</p>
       <h2>The Plug for Real<br><span class="gold">Fragrance.</span></h2>
-      <p>The Frag Man Plug started with a simple frustration: <strong>the best Middle Eastern fragrances were hard to try before you buy</strong>. Blind-buying a full bottle you might hate? That's a tax on curiosity.</p>
-      <p>So we became the plug: <strong>215+ authentic fragrances from 23 houses</strong> — Armaf, Lattafa, Rasasi, Afnan, Jo Milano Paris and more — hand-poured into 3ml, 5ml and 10ml decants, shipped from Florida. Full bottles for the ones you fall in love with, and custom hybrid mixes for those who want something no one else has.</p>
-      <p>Every decant is poured fresh from sealed stock when you order. No fakes, no watered-down mystery juice — just the real thing, at a price that lets you explore.</p>
+      <p>A fragrance can change how you feel. Finding yours should be an adventure, without a shelf full of blind buys.</p>
+      <p>So we became the plug: <strong>an extensive collection of authentic fragrances</strong> — Armaf, Lattafa, Rasasi, Afnan, Jo Milano Paris and more — hand-poured into 3ml, 5ml and 10ml decants, shipped from Florida. Full bottles for the ones you fall in love with, and custom hybrid mixes for those who want something no one else has.</p>
+      <p>Based in Florida, The Frag Man Plug brings discovery closer: sample different houses, explore your favorites, or create a blend of two scents.</p>
       <div class="values">
-        <div class="value"><span class="vi">💧</span><div><strong>Poured fresh, always</strong><small>Decants are filled when you order — never sitting pre-filled on a shelf.</small></div></div>
-        <div class="value"><span class="vi">🛡️</span><div><strong>Authenticity or nothing</strong><small>Sealed, verifiable stock only. Batch codes on every vial.</small></div></div>
+        <div class="value"><span class="vi">💧</span><div><strong>Poured fresh, always</strong><small>Hand-poured decants, made for your fragrance journey.</small></div></div>
+        <div class="value"><span class="vi">🛡️</span><div><strong>Authenticity or nothing</strong><small>Authentic branded fragrances, available in smaller sizes.</small></div></div>
         <div class="value"><span class="vi">🤝</span><div><strong>For the culture</strong><small>Built by fragrance lovers, for the community that lives it daily.</small></div></div>
       </div>
       <div class="story-stats">
-        <div><strong>215+</strong><span>Fragrances</span></div>
-        <div><strong>23</strong><span>Brands</span></div>
+        <div><strong data-total-products>—</strong><span>Fragrances</span></div>
+        <div><strong data-total-brands>—</strong><span>Brands</span></div>
         <div><strong>3</strong><span>Decant sizes</span></div>
-        <div><strong>48h</strong><span>Pour-to-ship</span></div>
+        <div><strong>FL</strong><span>Hand-poured</span></div>
       </div>
     </div>
-    <div class="story-visual"><div class="story-frame"><i></i></div></div>
+    <div class="story-visual"><img src="images/brand-lattafa.webp" alt="Representative AI-generated fragrance styling" loading="lazy"><p class="image-caption">THE ART OF DISCOVERY · DEMO STYLING</p></div>
   </div>
 </section>
 
-<!-- ══════════ REVIEWS ══════════ -->
-<section class="section tint" id="love"><div class="wrap">
-  <div class="section-head">
-    <p class="eyebrow">Word on the Street</p>
-    <h2>Loved by <span class="gold">Fragrance Heads</span></h2>
-  </div>
-  <div class="rating-bar">
-    <div class="stars">★★★★★</div>
-    <p><strong>4.9 / 5</strong> from 2,300+ verified reviews</p>
-  </div>
-  <div class="grid testi-grid">
-    <blockquote><span class="tstars">★★★★★</span><p>"Ordered decants of five hyped scents before committing. The Asad decant sold me — full bottle next."</p><cite>Marcus T.<small>Miami, FL · Verified buyer</small></cite></blockquote>
-    <blockquote><span class="tstars">★★★★★</span><p>"My custom hybrid mix gets me stopped on the street. Nobody else smells like this. Worth every penny."</p><cite>Danielle R.<small>Orlando, FL · Verified buyer</small></cite></blockquote>
-    <blockquote><span class="tstars">★★★★★</span><p>"You can tell these are the real thing. The Hawas decant smells exactly like my friend's retail bottle."</p><cite>Chris B.<small>Tampa, FL · Verified buyer</small></cite></blockquote>
-    <blockquote><span class="tstars">★★★★★</span><p>"Started with the 3ml of Club de Nuit Intense 'just to try'. Came back for the 10ml a week later."</p><cite>Priya S.<small>Atlanta, GA · Verified buyer</small></cite></blockquote>
-    <blockquote><span class="tstars">★★★★★</span><p>"Poured fresh, batch code on the vial, shipped fast. This is how decants should be done."</p><cite>James W.<small>Houston, TX · Verified buyer</small></cite></blockquote>
-    <blockquote><span class="tstars">★★★★☆</span><p>"Shipping took 4 days instead of 2, but the hand-written note and samples made up for it."</p><cite>Andre L.<small>Charlotte, NC · Verified buyer</small></cite></blockquote>
-  </div>
-</div></section>
+<section class="discovery-banner" id="discovery"><p class="eyebrow">Your scent. Your rules.</p><h2>Curiosity looks<br><em>good on you.</em></h2><p>Try a new house. Revisit a favorite. Build something entirely yours.</p><a class="btn btn-gold" href="#shop">Find Your Next Scent ↗</a></section>
 
 <!-- ══════════ FAQ ══════════ -->
 <section class="section" id="faq">
@@ -284,12 +235,12 @@
     <h2>Frequently <span class="gold">Asked</span></h2>
   </div>
   <div class="faq-list" id="faqList">
-    <div class="faq-item"><button class="faq-q">Are your decants authentic?<span class="fx">+</span></button><div class="faq-a"><p>Yes — 100%. Every decant is poured from sealed, verifiable stock of the real branded fragrance, and each vial carries a batch code. If it isn't authentic, it doesn't ship. Period.</p></div></div>
-    <div class="faq-item"><button class="faq-q">What decant sizes do you offer?<span class="fx">+</span></button><div class="faq-a"><p>Three sizes: 3ml (~35 sprays — the perfect taster), 5ml (~65 sprays — 2 to 3 weeks of wear), and 10ml (~130 sprays — a month or more). Full-size bottles are available too.</p></div></div>
-    <div class="faq-item"><button class="faq-q">How does the Custom Hybrid Mix work?<span class="fx">+</span></button><div class="faq-a"><p>Pick any two fragrances from the vault as your base and accent, set your ratio (70/30, 60/40 or 50/50) and choose a size. We blend it fresh to order and rest it 48 hours before shipping, with your mix name on the label.</p></div></div>
-    <div class="faq-item"><button class="faq-q">How long does shipping take?<span class="fx">+</span></button><div class="faq-a"><p>We pour and ship within 48 hours, Monday–Friday. US delivery is 2–5 business days tracked. Shipping is a flat $6.95, free on orders over $75.</p></div></div>
-    <div class="faq-item"><button class="faq-q">What is your return policy?<span class="fx">+</span></button><div class="faq-a"><p>Unopened full bottles can be returned within 30 days for a full refund. Decants and custom mixes are final sale for hygiene reasons — which is exactly why 3ml tasters exist.</p></div></div>
-    <div class="faq-item"><button class="faq-q">Do you sell full bottles too?<span class="fx">+</span></button><div class="faq-a"><p>Yes. Start with a decant, fall in love, then come back for the full bottle — many of our best customers do exactly that.</p></div></div>
+    <div class="faq-item"><button class="faq-q">Are your decants authentic?<span class="fx">+</span></button><div class="faq-a"><p>The business offers decants of authentic branded fragrances. A decant is a smaller portion transferred into a sample vial, rather than an original retail bottle.</p></div></div>
+    <div class="faq-item"><button class="faq-q">What decant sizes do you offer?<span class="fx">+</span></button><div class="faq-a"><p>Choose 3ml, 5ml or 10ml in this demo. Spray counts and wear time vary with the atomizer and how much you use. Full-bottle options will be confirmed for launch.</p></div></div>
+    <div class="faq-item"><button class="faq-q">How does the Custom Hybrid Mix work?<span class="fx">+</span></button><div class="faq-a"><p>Pick any two fragrances from the vault as your base and accent, set your ratio (70/30, 60/40 or 50/50) and choose a size. Preview your combination and add it to the demo cart. Final blend pricing and fulfillment details will be confirmed for launch.</p></div></div>
+    <div class="faq-item"><button class="faq-q">How long does shipping take?<span class="fx">+</span></button><div class="faq-a"><p>The business ships across the US from Florida. This demo uses an illustrative $6.95 shipping rate with free shipping from $75; final rates and delivery times need confirmation.</p></div></div>
+    <div class="faq-item"><button class="faq-q">What is your return policy?<span class="fx">+</span></button><div class="faq-a"><p>The final return policy will be confirmed before the store launches. This is a demonstration, and no payments or real orders are accepted.</p></div></div>
+    <div class="faq-item"><button class="faq-q">Do you sell full bottles too?<span class="fx">+</span></button><div class="faq-a"><p>Full bottles are part of the business offering. Bottle sizes, availability and prices have not been supplied yet, so this demo lets you explore decants first.</p></div></div>
   </div>
 </section>
 
@@ -302,7 +253,7 @@
     </div>
     <div class="f-col">
       <h4>Shop</h4>
-      <a href="#shop">All Fragrances</a><a href="#new">New Arrivals</a><a href="#mix">Custom Hybrid Mix</a>
+      <a href="#shop">All Fragrances</a><a href="#sizes">Find Your Size</a><a href="#mix">Custom Hybrid Mix</a>
     </div>
     <div class="f-col">
       <h4>Soon</h4>
@@ -310,18 +261,16 @@
     </div>
     <div class="f-col">
       <h4>House</h4>
-      <a href="#story">Our Story</a><a href="#love">Reviews</a><a href="#faq">FAQ</a>
-      <a href="admin.html" class="admin-link">Store Admin <em>(demo)</em></a>
+      <a href="#story">Our Story</a><a href="#sizes">Decant Guide</a><a href="#faq">FAQ</a>
     </div>
   </div>
   <div class="f-bottom">
-    <p>© 2026 The Frag Man Plug — Demo storefront. Prices shown are demo placeholders.</p>
-    <p class="f-admin-note">The <a href="admin.html">Store Admin</a> demo panel is for the owner only — customers never see it.</p>
+    <p>© 2026 The Frag Man Plug — Demo storefront. Prices are placeholders. AI-generated images represent brands, not exact products.</p>
   </div>
 </footer>
 
 <!-- ══════════ PRODUCT MODAL ══════════ -->
-<div class="modal" id="productModal" hidden>
+<div class="modal" id="productModal" role="dialog" aria-modal="true" aria-labelledby="pmName" hidden>
   <div class="modal-card">
     <button class="modal-x" data-close aria-label="Close">✕</button>
     <div class="pm-visual">
@@ -336,7 +285,7 @@
       <div class="pm-specs">
         <div class="pm-spec"><small>Poured</small><strong>Fresh to order</strong></div>
         <div class="pm-spec"><small>Stock</small><strong>100% authentic</strong></div>
-        <div class="pm-spec"><small>Vial</small><strong>Batch-coded</strong></div>
+        <div class="pm-spec"><small>Format</small><strong>Sample decant</strong></div>
       </div>
       <h5 style="font-size:.72rem;letter-spacing:.24em;text-transform:uppercase;color:var(--gold-deep);font-family:var(--sans);margin-bottom:.25rem">Choose your decant size</h5>
       <div class="size-row" id="pmSizes"></div>
@@ -344,7 +293,7 @@
         <span class="pm-price" id="pmPrice"></span>
         <button class="btn btn-gold" id="pmAdd">Add to Cart</button>
       </div>
-      <p class="muted small" style="margin-top:.8rem">Demo price — final pricing to be confirmed.</p>
+      <p class="muted small" style="margin-top:.8rem">Demo price · final pricing to be confirmed. Image is representative AI styling, not a photo of this exact fragrance.</p>
     </div>
   </div>
 </div>
@@ -352,20 +301,21 @@
 <!-- ══════════ CART DRAWER ══════════ -->
 <div class="drawer-wrap" id="drawerWrap" hidden>
   <div class="drawer-bg" data-close></div>
-  <aside class="drawer" role="dialog" aria-label="Shopping cart">
+  <aside class="drawer" role="dialog" aria-modal="true" aria-label="Shopping cart">
     <div class="drawer-head"><h3>Your Cart</h3><button class="modal-x" data-close aria-label="Close cart">✕</button></div>
     <div class="drawer-items" id="cartItems"></div>
     <div class="drawer-foot">
       <div class="row"><span>Subtotal</span><strong id="cartTotal">$0</strong></div>
-      <p class="muted small">Demo checkout — no payment is processed. Free US shipping over $75.</p>
+      <p class="muted small">Demo only · no payment is processed. Shipping estimates shown at the next step.</p>
       <button class="btn btn-gold full" id="checkoutBtn">Checkout</button>
     </div>
   </aside>
 </div>
 
-<div class="toast" id="toast" hidden></div>
+<div class="modal checkout-modal" id="checkoutModal" role="dialog" aria-modal="true" aria-labelledby="checkoutTitle" hidden><div class="checkout-card"><button class="modal-x" data-close aria-label="Close checkout">✕</button><div id="checkoutContent"><p class="eyebrow">One last look</p><h2 id="checkoutTitle">Your discovery awaits.</h2><p class="muted">Demo checkout. Use sample details only. No payment or shipment.</p><form id="checkoutForm"><div class="checkout-fields"><label>Name<input name="customer" required maxlength="80" placeholder="Demo Customer" autocomplete="off"></label><label>Email<input name="email" type="email" required placeholder="demo@example.com" autocomplete="off"></label><label>Delivery state<select name="state" required><option value="">Choose a US state</option></select></label></div><div id="checkoutSummary"></div><p class="demo-note">All amounts are illustrative. Taxes, final shipping rules and real payments are not connected.</p><button class="btn btn-gold full" type="submit">Place Demo Order ↗</button><button class="text-button" id="backToCart" type="button">← Back to your bag</button></form></div><div id="checkoutSuccess" hidden><p class="eyebrow">Demo complete</p><h2>Your next scent is calling.</h2><p id="orderConfirmation"></p><p class="muted">This demonstration is saved in this browser’s admin preview. No payment, email or shipment was created.</p><button class="btn btn-gold" data-close>Keep Exploring</button></div></div></div><div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="products.js"></script>
 <script src="app.js"></script>
+<script src="experience.js"></script>
 </body>
 </html>

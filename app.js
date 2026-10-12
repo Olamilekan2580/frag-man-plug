@@ -1,9 +1,9 @@
 /* ═══ The Frag Man Plug — demo store logic (real catalog) ═══ */
 
 const SIZES = [
-  { id:'3ml',  label:'3ml Decant',  sub:'~35 sprays · perfect taster' },
-  { id:'5ml',  label:'5ml Decant',  sub:'~65 sprays · 2–3 weeks wear' },
-  { id:'10ml', label:'10ml Decant', sub:'~130 sprays · a month+ wear' },
+  { id:'3ml',  label:'3ml Decant',  sub:'A first impression' },
+  { id:'5ml',  label:'5ml Decant',  sub:'Get to know your scent' },
+  { id:'10ml', label:'10ml Decant', sub:'Keep your favorite close' },
 ];
 
 const BRANDS = [...new Set(PRODUCTS.map(p=>p.brand))].sort();
@@ -11,7 +11,7 @@ const BRANDS = [...new Set(PRODUCTS.map(p=>p.brand))].sort();
 /* brand imagery — one bottle photo per brand, generated for the demo */
 const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
 const BRAND_IMG = {};
-BRANDS.forEach(b => { BRAND_IMG[b] = 'images/brand-' + slug(b) + '.png'; });
+BRANDS.forEach(b => { BRAND_IMG[b] = 'images/brand-' + slug(b) + '.webp'; });
 const brandImg = p => BRAND_IMG[p.brand] || '';
 
 /* admin overrides (demo) — prices/stock edited in admin.html persist here */
@@ -31,7 +31,12 @@ const FEATURED_IDS = ['lattafa-asad','armaf-club-de-nuit-intense-man-edt','rasas
 const byId = id => PRODUCTS.find(p=>p.id===id);
 
 /* ── state ── */
-let cart = [];
+const readStore = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
+const writeStore = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch { toast('Browser storage unavailable; changes last for this visit.'); } };
+let cart = readStore('fmp_cart', []);
+if (!Array.isArray(cart)) cart = [];
+cart = cart.filter(it => it && typeof it.name === 'string' && typeof it.detail === 'string' && Number.isFinite(it.price) && it.price > 0).map(it => ({...it, qty: Math.min(99, Math.max(1, Math.floor(it.qty || 1)))}));
+let visibleLimit = 24, sortOrder = 'original';
 let activeBrand = 'all';
 let searchTerm = '';
 let mixSearch = '';
@@ -39,7 +44,7 @@ let pmProduct = null, pmSize = '5ml';
 let mixBase = null, mixAccent = null, mixRatio = '60/40', mixSize = { s:'10ml', p:42 };
 
 const $ = s => document.querySelector(s);
-const money = n => '$' + n;
+const money = n => new Intl.NumberFormat('en-US', {style:'currency',currency:'USD'}).format(n);
 const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const famLabel = p => p.line ? `${p.brand} · ${p.line}` : p.brand;
 
@@ -49,7 +54,7 @@ function cardHTML(p){
   return `<article class="card reveal${oos?' oos':''}" data-card="${p.id}">
     <div class="card-visual">
       <div class="mono-tile" aria-hidden="true">${esc(p.mono)}</div>
-      <img class="card-img" src="${brandImg(p)}" alt="${esc(p.name)}" loading="lazy" onerror="this.style.display='none'">
+      <img class="card-img" src="${brandImg(p)}" alt="Representative ${esc(p.brand)} demo imagery" loading="lazy" onerror="this.style.display='none'">
       <span class="demo-tag">demo price</span>
       ${oos?'<span class="oos-tag">Out of stock</span>':''}
     </div>
@@ -59,7 +64,7 @@ function cardHTML(p){
       <p class="card-notes">${esc(p.blurb)}</p>
       <div class="card-foot">
         <span class="card-price">${money(p.prices['3ml'])}<small>3ml decant · demo price</small></span>
-        <button class="card-btn" data-view="${p.id}">View</button>
+        <button class="card-btn" data-view="${p.id}" aria-label="Choose size for ${esc(p.name)}">Choose size ↗</button>
       </div>
     </div>
   </article>`;
@@ -67,21 +72,26 @@ function cardHTML(p){
 
 function filteredProducts(){
   const q = searchTerm.trim().toLowerCase();
-  return PRODUCTS.filter(p=>{
+  const list = PRODUCTS.filter(p=>{
     if(activeBrand!=='all' && p.brand!==activeBrand) return false;
     if(q && !(p.name.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q) || (p.line||'').toLowerCase().includes(q))) return false;
     return true;
   });
+  if(sortOrder==='az') list.sort((a,b)=>a.name.localeCompare(b.name));
+  if(sortOrder==='price') list.sort((a,b)=>a.prices['3ml']-b.prices['3ml'] || a.name.localeCompare(b.name));
+  return list;
 }
 
 function renderShop(){
   const list = filteredProducts();
-  $('#shopGrid').innerHTML = list.map(cardHTML).join('') ||
-    `<p class="muted" style="text-align:center;grid-column:1/-1;padding:2rem">No fragrances match — try a different search or brand.</p>`;
+  $('#shopGrid').innerHTML = list.slice(0,visibleLimit).map(cardHTML).join('') ||
+    `<div class="empty-state"><h3>No scents found.</h3><p>Try another name or explore the whole collection.</p><button class="btn btn-ghost" id="clearFilters">Reset filters</button></div>`;
   const total = PRODUCTS.length;
   $('#shopCount').textContent = list.length===total
     ? `${total} fragrances · ${BRANDS.length} brands`
     : `Showing ${list.length} of ${total}`;
+  $('#loadMore').hidden = visibleLimit >= list.length;
+  $('#loadMore').textContent = `Discover More (${Math.max(0,list.length-visibleLimit)} remaining)`;
   observeReveals();
 }
 
@@ -116,9 +126,9 @@ function openProduct(id){
   $('#pmName').textContent = p.name;
   $('#pmMono').textContent = p.mono;
   const pmImg = $('#pmImg');
-  pmImg.src = brandImg(p); pmImg.alt = p.name;
+  pmImg.src = brandImg(p); pmImg.alt = `Representative ${p.brand} AI demo styling`;
   pmImg.style.display = ''; pmImg.onerror = ()=>{ pmImg.style.display='none'; };
-  $('#pmDesc').textContent = p.blurb + ' Poured fresh from sealed, authentic stock — decanted to order in Florida.';
+  $('#pmDesc').textContent = p.blurb + ' Available as a hand-poured decant from Florida. Explore a little before committing to more.';
   $('#pmBadges').innerHTML = p.badges.map(b=>`<span class="pm-badge">✦ ${b}</span>`).join('') +
     `<span class="pm-badge demo">demo price</span>`;
   $('#pmSizes').innerHTML = SIZES.map(s=>
@@ -134,23 +144,29 @@ function openProduct(id){
   }
   $('#productModal').hidden = false;
   document.body.style.overflow = 'hidden';
+  focusOverlay($('#productModal'));
 }
 function closeModal(){ $('#productModal').hidden = true; document.body.style.overflow = ''; }
 
 /* ── cart ── */
-function addToCart(name, detail, price){
-  cart.push({name, detail, price});
-  renderCart(); toast(`Added — ${name} (${detail})`);
+function addToCart(name, detail, price, productId = null, size = null){
+  const existing = cart.find(it => it.name === name && it.detail === detail);
+  if(existing) existing.qty = Math.min(99, existing.qty + 1);
+  else cart.push({name, detail, price, qty:1, productId, size});
+  renderCart(); toast(`Added to your bag — ${name}`);
+}
+function syncCart(){
+  cart = cart.filter(it => !it.productId || byId(it.productId)?.inStock);
+  cart.forEach(it => { if(it.productId && it.size) it.price = byId(it.productId).prices[it.size]; });
 }
 function renderCart(){
-  $('#cartCount').textContent = cart.length;
-  const box = $('#cartItems');
-  if(!cart.length){ box.innerHTML = '<p class="cart-empty">Your cart is empty.<br>The scent journey begins with a decant. ✦</p>'; }
-  else box.innerHTML = cart.map((it,i)=>`
-    <div class="cart-item"><div class="ci-info"><strong>${esc(it.name)}</strong><small>${esc(it.detail)}</small></div>
-    <span class="ci-price">${money(it.price)}</span>
-    <button class="ci-rm" data-rm="${i}" aria-label="Remove">✕</button></div>`).join('');
-  $('#cartTotal').textContent = money(cart.reduce((a,b)=>a+b.price,0));
+  syncCart();
+  writeStore('fmp_cart',cart);
+  $('#cartCount').textContent = cart.reduce((n,it)=>n+it.qty,0);
+  $('#checkoutBtn').disabled = !cart.length;
+  $('#cartItems').innerHTML = cart.length ? cart.map((it,i)=>`
+    <div class="cart-item"><div class="ci-info"><strong>${esc(it.name)}</strong><small>${esc(it.detail)}</small><div class="quantity"><button data-qty="${i}" data-delta="-1" aria-label="Decrease quantity for ${esc(it.name)}">−</button><span>${it.qty}</span><button data-qty="${i}" data-delta="1" aria-label="Increase quantity for ${esc(it.name)}">+</button></div></div><span class="ci-price">${money(it.price*it.qty)}</span><button class="ci-rm" data-rm="${i}" aria-label="Remove ${esc(it.name)}">✕</button></div>`).join('') : '<div class="cart-empty"><p class="eyebrow">A little curiosity goes a long way.</p><h3>Your discovery starts here.</h3><p>Your bag is waiting for its first fragrance.</p><button class="btn btn-gold" data-close>Explore the Collection</button></div>';
+  $('#cartTotal').textContent = money(cart.reduce((a,b)=>a+b.price*b.qty,0));
 }
 function toast(msg){
   const t = $('#toast'); t.textContent = msg; t.hidden = false;
@@ -160,15 +176,15 @@ function toast(msg){
 /* ── mix builder ── */
 function mixList(){
   const q = mixSearch.trim().toLowerCase();
-  if(!q) return PRODUCTS;
-  return PRODUCTS.filter(p=>p.name.toLowerCase().includes(q)||p.brand.toLowerCase().includes(q));
+  if(!q) return PRODUCTS.filter(p=>p.inStock);
+  return PRODUCTS.filter(p=>p.inStock && (p.name.toLowerCase().includes(q)||p.brand.toLowerCase().includes(q)));
 }
 function renderMixPicks(){
   const list = mixList();
   const mk = (el, sel, other, fn) => {
     el.innerHTML = list.map(p=>{
       const dis = (p.id===other) ? ' disabled' : '';
-      return `<div class="mix-pick${sel===p.id?' sel':''}${dis}" data-id="${p.id}"><strong>${esc(p.name)}</strong><small>${esc(p.brand)}</small></div>`;
+      return `<button type="button" class="mix-pick${sel===p.id?' sel':''}${dis}" data-id="${p.id}" ${p.id===other?'disabled':''} aria-pressed="${sel===p.id}"><strong>${esc(p.name)}</strong><small>${esc(p.brand)}</small></button>`;
     }).join('') || '<p class="muted small">No matches.</p>';
     el.querySelectorAll('.mix-pick:not(.disabled)').forEach(d=>d.onclick=()=>fn(d.dataset.id));
   };
@@ -182,7 +198,7 @@ function updateMix(){
   if(b && a && b.id!==a.id){
     const name = `${b.name} × ${a.name}`;
     $('#mixName').textContent = name;
-    $('#mixDesc').textContent = `${mixRatio} — ${b.name} leading, ${a.name} weaving through. Blended fresh to order, rested 48 hours.`;
+    $('#mixDesc').textContent = `${mixRatio} — ${b.name} leading, ${a.name} weaving through. Your custom blend preview.`;
     $('#mixPrice').textContent = `${mixSize.s} · ${money(mixSize.p)}`;
     btn.disabled = false;
     btn.onclick = ()=>addToCart('Custom Hybrid Mix', `${name} · ${mixRatio} · ${mixSize.s} · demo price`, mixSize.p);
@@ -211,22 +227,22 @@ document.addEventListener('click', e=>{
   if(v){ openProduct(v.dataset.view); return; }
   const card = e.target.closest('[data-card]');
   if(card){ openProduct(card.dataset.card); return; }
-  if(e.target.closest('[data-close]')){ closeModal(); $('#drawerWrap').hidden = true; document.body.style.overflow=''; return; }
+  if(e.target.closest('[data-close]')){ closeOverlays(); return; }
   const rm = e.target.closest('[data-rm]'); if(rm){ cart.splice(+rm.dataset.rm,1); renderCart(); return; }
   const sz = e.target.closest('#pmSizes button'); if(sz){ pmSize = sz.dataset.size;
     document.querySelectorAll('#pmSizes button').forEach(b=>b.classList.toggle('active', b===sz));
     $('#pmPrice').textContent = money(pmProduct.prices[pmSize]); return; }
   const chip = e.target.closest('.chip'); if(chip){
     document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active')); chip.classList.add('active');
-    activeBrand = chip.dataset.brand; renderShop(); return; }
+    activeBrand = chip.dataset.brand; visibleLimit = 24; renderShop(); return; }
 });
-$('#pmAdd').onclick = ()=>{ if(!pmProduct) return; const s = SIZES.find(x=>x.id===pmSize);
-  addToCart(pmProduct.name, `${pmProduct.brand} · ${s.label} · demo price`, pmProduct.prices[pmSize]); };
-$('#cartBtn').onclick = ()=>{ $('#drawerWrap').hidden = false; document.body.style.overflow='hidden'; };
-$('#checkoutBtn').onclick = ()=>toast('Demo checkout — the real store will process payment securely.');
-$('#burger').onclick = ()=>$('#navLinks').classList.toggle('open');
-document.querySelectorAll('#navLinks a').forEach(a=>a.addEventListener('click',()=>$('#navLinks').classList.remove('open')));
-$('#shopSearch').addEventListener('input', e=>{ searchTerm = e.target.value; renderShop(); });
+$('#pmAdd').onclick = ()=>{ if(!pmProduct || !pmProduct.inStock) return; const s = SIZES.find(x=>x.id===pmSize);
+  addToCart(pmProduct.name, `${pmProduct.brand} · ${s.label} · demo price`, pmProduct.prices[pmSize], pmProduct.id, pmSize); closeModal(); openCart(); };
+$('#cartBtn').onclick = ()=>openCart();
+$('#checkoutBtn').onclick = ()=>openCheckout();
+$('#burger').onclick = ()=>{const open = $('#navLinks').classList.toggle('open'); $('#burger').setAttribute('aria-expanded',open);};
+document.querySelectorAll('#navLinks a').forEach(a=>a.addEventListener('click',()=>{ $('#navLinks').classList.remove('open'); $('#burger').setAttribute('aria-expanded','false'); }));
+$('#shopSearch').addEventListener('input', e=>{ searchTerm = e.target.value; visibleLimit = 24; renderShop(); });
 $('#mixRatio').addEventListener('click', e=>{ const b=e.target.closest('button'); if(!b) return;
   document.querySelectorAll('#mixRatio button').forEach(x=>x.classList.remove('active')); b.classList.add('active');
   mixRatio = b.dataset.r; updateMix(); });
@@ -237,8 +253,8 @@ $('#mixSearch').addEventListener('input', e=>{ mixSearch = e.target.value; rende
 $('#notifyForm').addEventListener('submit', e=>{ e.preventDefault();
   const em = $('#notifyEmail').value.trim();
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)){ toast('Please enter a valid email address.'); $('#notifyEmail').focus(); return; }
-  $('#notifyForm').hidden = true; $('#notifyOk').hidden = false; toast('You\u2019re on the launch list ✦'); });
-document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ closeModal(); $('#drawerWrap').hidden=true; document.body.style.overflow=''; }});
+  $('#notifyForm').hidden = true; $('#notifyOk').hidden = false; toast('Demo signup complete — no email saved or sent'); });
+
 
 /* ── init ── */
 renderBrandChips(); renderFeatured(); renderShop();

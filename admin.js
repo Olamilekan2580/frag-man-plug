@@ -56,7 +56,7 @@ function renderProducts(){
       <td class="pname">${esc(p.name)}${p.line?`<small>${esc(p.line)}</small>`:''}</td>
       <td>${esc(p.brand)}</td>
       ${['3ml','5ml','10ml'].map(s=>
-        `<td class="num"><input type="number" min="1" step="1" class="price-in" data-pid="${p.id}" data-size="${s}" value="${effPrice(p,s)}" aria-label="${esc(p.name)} ${s} price"></td>`
+        `<td class="num"><input type="number" min="1" step="0.01" class="price-in" data-pid="${p.id}" data-size="${s}" value="${effPrice(p,s)}" aria-label="${esc(p.name)} ${s} price"></td>`
       ).join('')}
       <td><button class="stock-toggle ${stock?'on':''}" data-stock="${p.id}" aria-pressed="${stock}">
         <span class="knob"></span><span class="st-label">${stock?'In stock':'Out of stock'}</span>
@@ -74,7 +74,7 @@ document.addEventListener('change', e=>{
   const inp = e.target.closest('.price-in');
   if(inp){
     const pid = inp.dataset.pid, size = inp.dataset.size;
-    const v = Math.max(1, Math.round(+inp.value || 0));
+    const v = Math.max(1, Math.round((+inp.value || 0)*100)/100);
     inp.value = v;
     priceOverrides[pid] = priceOverrides[pid] || {};
     priceOverrides[pid][size] = v;
@@ -104,7 +104,7 @@ document.addEventListener('click', e=>{
 });
 
 /* ── orders (mock) ── */
-const ORDERS = [
+const SAMPLE_ORDERS = [
   {id:'FMP-1042', customer:'Marcus T. · Miami, FL', items:'Lattafa Asad (5ml) ×1 · Rasasi Hawas (3ml) ×2', total:32, date:'2026-10-11'},
   {id:'FMP-1041', customer:'Danielle R. · Orlando, FL', items:'Custom Hybrid Mix (10ml) ×1', total:42, date:'2026-10-11'},
   {id:'FMP-1040', customer:'Chris B. · Tampa, FL', items:'Rasasi Hawas Original (10ml) ×1', total:24, date:'2026-10-10'},
@@ -116,8 +116,10 @@ const ORDERS = [
   {id:'FMP-1034', customer:'Alicia G. · Phoenix, AZ', items:'Custom Hybrid Mix (5ml) ×1 · Rayhaan Azul (3ml) ×1', total:34, date:'2026-10-07'},
   {id:'FMP-1033', customer:'Tom H. · Chicago, IL', items:'Rasasi Hawas Ice (5ml) ×1', total:14, date:'2026-10-07'},
 ];
+const demoOrders = load('fmp_demo_orders', []);
+const ORDERS = [...(Array.isArray(demoOrders) ? demoOrders : []), ...SAMPLE_ORDERS];
 const STATUSES = ['Pending','Processing','Shipped','Delivered','Cancelled'];
-const oStatus = o => orderStatus[o.id] || (o.id>='FMP-1041' ? 'Processing' : o.id>='FMP-1038' ? 'Shipped' : 'Delivered');
+const oStatus = o => orderStatus[o.id] || (o.demo ? 'Pending' : o.id>='FMP-1041' ? 'Processing' : o.id>='FMP-1038' ? 'Shipped' : 'Delivered');
 
 function renderOrderStats(){
   const rev = ORDERS.reduce((a,o)=>a+o.total,0);
@@ -148,7 +150,7 @@ const DEFAULT_SETTINGS = {
   storeName: 'The Frag Man Plug',
   announcement: 'Complimentary US shipping on orders $75+ · Hand-poured in Florida',
   shipThreshold: 75,
-  supportEmail: 'hello@thefragmanplug.com'
+  supportEmail: ''
 };
 function renderSettings(){
   const s = settings || DEFAULT_SETTINGS;
@@ -169,8 +171,9 @@ $('#settingsForm').addEventListener('submit', e=>{
   toast('Settings saved ✓');
 });
 $('#resetDemo').addEventListener('click', ()=>{
-  ['fmp_price_overrides','fmp_stock','fmp_order_status','fmp_settings'].forEach(k=>localStorage.removeItem(k));
+  ['fmp_price_overrides','fmp_stock','fmp_order_status','fmp_settings','fmp_cart','fmp_demo_orders'].forEach(k=>localStorage.removeItem(k));
   priceOverrides = {}; stockMap = {}; orderStatus = {}; settings = null;
+  ORDERS.splice(0, ORDERS.length, ...SAMPLE_ORDERS);
   renderProducts(); renderOrders(); renderSettings();
   toast('Demo data reset');
 });
