@@ -61,11 +61,7 @@
       </div>
     </div>
     <div class="hero-visual">
-      <div class="bottle-showcase">
-        <div class="bottle" style="--h1:#5a3d1e"><i></i></div>
-        <div class="bottle tall" style="--h1:#3d2a16"><i></i></div>
-        <div class="bottle" style="--h1:#4a2f18"><i></i></div>
-      </div>
+      <img class="hero-img" src="images/hero-flatlay.png" alt="Luxury fragrance flat-lay — The Frag Man Plug" onerror="this.style.display='none'">
     </div>
   </div>
 </section>
@@ -315,10 +311,12 @@
     <div class="f-col">
       <h4>House</h4>
       <a href="#story">Our Story</a><a href="#love">Reviews</a><a href="#faq">FAQ</a>
+      <a href="admin.html" class="admin-link">Store Admin <em>(demo)</em></a>
     </div>
   </div>
   <div class="f-bottom">
     <p>© 2026 The Frag Man Plug — Demo storefront. Prices shown are demo placeholders.</p>
+    <p class="f-admin-note">The <a href="admin.html">Store Admin</a> demo panel is for the owner only — customers never see it.</p>
   </div>
 </footer>
 
@@ -326,7 +324,10 @@
 <div class="modal" id="productModal" hidden>
   <div class="modal-card">
     <button class="modal-x" data-close aria-label="Close">✕</button>
-    <div class="pm-visual"><div class="mono-tile pm-mono" id="pmMono"></div></div>
+    <div class="pm-visual">
+      <div class="mono-tile pm-mono" id="pmMono" aria-hidden="true"></div>
+      <img class="pm-img" id="pmImg" alt="" onerror="this.style.display='none'">
+    </div>
     <div class="pm-info">
       <p class="eyebrow" id="pmEyebrow"></p>
       <h3 id="pmName"></h3>
@@ -364,6 +365,7 @@
 
 <div class="toast" id="toast" hidden></div>
 
+<script src="products.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
