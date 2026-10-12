@@ -4,26 +4,27 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<title>Store Admin — The Frag Man Plug (Demo)</title>
+<title>VEGArance — Studio</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="stylesheet" href="fonts.css">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="refinement.css">
 <link rel="stylesheet" href="layout-fixes.css">
 <link rel="stylesheet" href="admin-crud.css">
+<link rel="stylesheet" href="vegarance.css">
 </head>
 <body class="admin-body">
 
 <header class="admin-top">
   <div class="admin-top-inner">
-    <a class="brand" href="index.html"><span class="brand-mark">FP</span><span class="brand-text">The Frag Man <em>Plug</em></span></a>
+    <a class="brand" href="index.html"><span class="brand-mark">V</span><span class="brand-text">VEGA<em>rance</em></span></a>
     <div class="admin-title">
       <h1>Store Admin</h1>
-      <span class="demo-badge">DEMO</span><button class="btn btn-ghost btn-sm" id="logoutOwner" hidden>Sign out</button>
+      <span class="demo-badge">STUDIO</span><button class="btn btn-ghost btn-sm" id="logoutOwner" hidden>Sign out</button>
     </div>
     <a class="btn btn-ghost btn-sm" href="index.html">← Back to Store</a>
   </div>
-  <p class="admin-notice">Demo admin panel — in the real build this page is password-protected and restricted to authorized owners. Changes you make here are saved in this browser and reflected when you return to or refresh the storefront. No server, authentication, real payments or customer notifications are connected.</p>
+  <p class="admin-notice">VEGArance Studio — manage your products, images, prices, availability and orders. On the Node service, changes are saved to the server and owner access requires your private password. Sales remain in preview until payments and fulfillment are configured.</p>
 </header>
 
 <nav class="admin-tabs" role="tablist">
@@ -65,7 +66,7 @@
         <tbody id="orderRows"></tbody>
       </table>
     </div>
-    <p class="admin-hint">Sample orders and locally placed demo orders — in the real build these arrive live from checkout, with customer emails and tracking numbers.</p>
+    <p class="admin-hint">The Node service shows server-saved preview orders. Preview orders do not process payments or trigger fulfillment.</p>
   </section>
 
   <!-- ══════════ SETTINGS ══════════ -->
@@ -88,13 +89,13 @@
         <button type="button" class="btn btn-ghost" id="resetDemo">Reset demo data</button>
       </div>
     </form>
-    <p class="admin-hint">In the real build, settings here control the live storefront — announcement bar, shipping rules, taxes and notification emails.</p>
+    <p class="admin-hint">Store name, announcement and shipping threshold are applied to the storefront. Support email is stored for launch; email delivery and tax calculation are not connected.</p>
   </section>
 
 </main>
 
 <footer class="admin-foot">
-  <p>The Frag Man Plug — demo admin · <a href="index.html">View storefront</a></p>
+  <p>VEGArance — demo admin · <a href="index.html">View storefront</a></p>
 </footer>
 
 <dialog class="product-dialog" id="productEditor"><div class="dialog-heading"><div><p class="eyebrow">Catalog management</p><h2 id="editorTitle">Add a fragrance</h2></div><button type="button" id="productEditorClose" aria-label="Close product editor">✕</button></div><form id="productForm"><fieldset class="product-fields" id="productFields"><label>Fragrance name<input name="name" required maxlength="160"></label><label>Brand<input name="brand" required maxlength="80"></label><label class="wide">Collection / line (optional)<input name="line" maxlength="100"></label><label class="wide">Description<textarea name="blurb" maxlength="1600"></textarea></label><div class="price-fields"><label>3ml price (USD)<input name="3ml" type="number" required min="0.01" max="10000" step="0.01"></label><label>5ml price (USD)<input name="5ml" type="number" required min="0.01" max="10000" step="0.01"></label><label>10ml price (USD)<input name="10ml" type="number" required min="0.01" max="10000" step="0.01"></label></div><label class="stock-field wide"><input name="inStock" type="checkbox">Available to order</label><label class="wide">Image URL (optional)<input name="image" type="text" placeholder="https://… or upload an image"></label><label class="wide">Upload an image<input name="upload" type="file" accept="image/png,image/jpeg,image/webp"></label><img class="upload-preview wide" id="productPreview" alt="Product preview"></fieldset><p class="form-error" id="productError" role="alert"></p><div class="dialog-actions"><button class="btn btn-gold" id="productSave" type="submit">Save Product</button><button class="btn btn-gold" id="productEditFromView" type="button" hidden>Edit Product</button><button class="btn btn-ghost" id="productCancel" type="button">Close</button></div></form></dialog><dialog class="product-dialog" id="deleteProductDialog"><p class="eyebrow">Delete product</p><h2>Remove this fragrance?</h2><p id="deleteName" style="margin-top:20px"></p><p class="muted small" style="margin-top:12px">This removes the product from the catalog. Existing order summaries are kept.</p><p class="form-error" id="deleteError" role="alert"></p><div class="dialog-actions"><button class="danger-button" id="confirmDelete">Delete Product</button><button class="btn btn-ghost" id="cancelDelete">Keep Product</button></div></dialog><dialog class="product-dialog owner-login" id="ownerLogin"><p class="eyebrow">Owner access</p><h2>Sign in to manage the store.</h2><form id="ownerLoginForm"><label>Password<input type="password" id="ownerPassword" required autocomplete="current-password"></label><p class="form-error" id="loginError" role="alert"></p><button class="btn btn-gold full" id="ownerLoginSubmit" type="submit">Sign In</button></form></dialog>

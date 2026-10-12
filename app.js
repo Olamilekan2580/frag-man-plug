@@ -1,4 +1,4 @@
-/* ═══ The Frag Man Plug — demo store logic (real catalog) ═══ */
+/* ═══ VEGArance — demo store logic (real catalog) ═══ */
 
 const SIZES = [
   { id:'3ml',  label:'3ml Decant',  sub:'A first impression' },
@@ -17,8 +17,8 @@ const brandImg = p => p.image || (typeof PRODUCT_IMAGES !== 'undefined' && PRODU
 /* admin overrides (demo) — prices/stock edited in admin.html persist here */
 (function applyAdminOverrides(){
   try{
-    const po = Store.server ? {} : JSON.parse(localStorage.getItem('fmp_price_overrides')||'{}');
-    const sm = JSON.parse(localStorage.getItem('fmp_stock')||'{}');
+    const po = Store.server ? {} : JSON.parse(localStorage.getItem('vegarance_price_overrides')||'{}');
+    const sm = JSON.parse(localStorage.getItem('vegarance_stock')||'{}');
     PRODUCTS.forEach(p=>{
       if(po[p.id]) p.prices = Object.assign({}, p.prices, po[p.id]);
       p.inStock = Store.server ? p.inStock !== false : (sm[p.id] ?? p.inStock) !== false;
@@ -33,12 +33,14 @@ const byId = id => PRODUCTS.find(p=>p.id===id);
 /* ── state ── */
 const readStore = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
 const writeStore = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch { toast('Browser storage unavailable; changes last for this visit.'); } };
-let cart = readStore('fmp_cart', []);
+let cart = readStore('vegarance_cart', []);
 if (!Array.isArray(cart)) cart = [];
 cart = cart.filter(it => it && typeof it.name === 'string' && typeof it.detail === 'string' && Number.isFinite(it.price) && it.price > 0).map(it => ({...it, qty: Math.min(99, Math.max(1, Math.floor(it.qty || 1)))}));
 let visibleLimit = 24, sortOrder = 'original';
 let activeBrand = 'all';
 let searchTerm = '';
+const savedIds = new Set((()=>{const ids=readStore('vegarance_saved',[]);return Array.isArray(ids)?ids.filter(id=>typeof id==='string'&&byId(id)):[];})());
+let savedOnly = false;
 let mixSearch = '';
 let pmProduct = null, pmSize = '5ml';
 let mixBase = null, mixAccent = null, mixRatio = '60/40', mixSize = { s:'10ml', p:42 };
@@ -53,6 +55,7 @@ function cardHTML(p){
   const oos = !p.inStock;
   return `<article class="card reveal${oos?' oos':''}" data-card="${p.id}">
     <div class="card-visual">
+      <button class="save-scent" data-save="${esc(p.id)}" aria-pressed="${savedIds.has(p.id)}" aria-label="${savedIds.has(p.id)?'Unsave':'Save'} ${esc(p.name)}">${savedIds.has(p.id)?'♥':'♡'}</button>
       <div class="mono-tile" aria-hidden="true">${esc(p.mono)}</div>
       <img class="card-img" src="${esc(brandImg(p))}" alt="${esc(p.name)} — catalog artwork using representative AI brand imagery" width="560" height="700" loading="lazy" decoding="async" onerror="this.style.display='none'">
       ${oos?'<span class="oos-tag">Out of stock</span>':''}
@@ -60,7 +63,7 @@ function cardHTML(p){
     <div class="card-body">
       <p class="card-family">${esc(famLabel(p).toUpperCase())}</p>
       <h3>${esc(p.name)}</h3>
-      <p class="card-notes">Hand-poured in Florida · 3ml / 5ml / 10ml</p>
+      <p class="card-notes">3ml / 5ml / 10ml · Discovery sizes</p>
       <div class="card-foot">
         <span class="card-price">${money(p.prices['3ml'])}<small>3ml decant · demo price</small></span>
         <button class="card-btn" data-view="${p.id}" aria-label="Choose size for ${esc(p.name)}">Choose size ↗</button>
@@ -72,6 +75,7 @@ function cardHTML(p){
 function filteredProducts(){
   const q = searchTerm.trim().toLowerCase();
   const list = PRODUCTS.filter(p=>{
+    if(savedOnly && !savedIds.has(p.id)) return false;
     if(activeBrand!=='all' && p.brand!==activeBrand) return false;
     if(q && !(p.name.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q) || (p.line||'').toLowerCase().includes(q))) return false;
     return true;
@@ -127,7 +131,7 @@ function openProduct(id){
   const pmImg = $('#pmImg');
   pmImg.src = brandImg(p); pmImg.alt = `Representative ${p.brand} AI demo styling`;
   pmImg.style.display = ''; pmImg.onerror = ()=>{ pmImg.style.display='none'; };
-  $('#pmDesc').textContent = (p.blurb || 'Explore this fragrance in a hand-poured decant.') + ' Available as a hand-poured decant from Florida. Explore a little before committing to more.';
+  $('#pmDesc').textContent = (p.blurb || 'Explore this fragrance in a hand-poured decant.') + ' Explore a little before committing to more.';
   $('#pmBadges').innerHTML = (p.badges || []).map(b=>`<span class="pm-badge">✦ ${b}</span>`).join('') +
     `<span class="pm-badge demo">demo price</span>`;
   $('#pmSizes').innerHTML = SIZES.map(s=>
@@ -160,7 +164,7 @@ function syncCart(){
 }
 function renderCart(){
   syncCart();
-  writeStore('fmp_cart',cart);
+  writeStore('vegarance_cart',cart);
   $('#cartCount').textContent = cart.reduce((n,it)=>n+it.qty,0);
   $('#checkoutBtn').disabled = !cart.length;
   $('#cartItems').innerHTML = cart.length ? cart.map((it,i)=>`
@@ -222,6 +226,7 @@ function initFaq(){
 
 /* ── events ── */
 document.addEventListener('click', e=>{
+  if(e.target.closest('[data-save]'))return;
   const v = e.target.closest('[data-view]');
   if(v){ openProduct(v.dataset.view); return; }
   const card = e.target.closest('[data-card]');
@@ -231,7 +236,7 @@ document.addEventListener('click', e=>{
   const sz = e.target.closest('#pmSizes button'); if(sz){ pmSize = sz.dataset.size;
     document.querySelectorAll('#pmSizes button').forEach(b=>b.classList.toggle('active', b===sz));
     $('#pmPrice').textContent = money(pmProduct.prices[pmSize]); return; }
-  const chip = e.target.closest('.chip'); if(chip){
+  const chip = e.target.closest('.chip[data-brand]'); if(chip){
     document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active')); chip.classList.add('active');
     activeBrand = chip.dataset.brand; visibleLimit = 24; renderShop(); return; }
 });

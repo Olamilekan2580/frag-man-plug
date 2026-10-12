@@ -1,6 +1,14 @@
-# The Frag Man Plug
+# VEGArance
 
-A responsive fragrance storefront for Jonathan Castellanos, with an HTML/CSS/JavaScript frontend and an optional Node/SQLite backend. Stripe and production payment fulfillment remain disconnected. See [RENDER-SETUP.md](RENDER-SETUP.md) to create the server-backed free Render demo selected by the user.
+Independent fragrance storefront owned by the project author. Work locally with `cd /home/olamihacks/vegarance` and `npm start`.
+
+Current release: VEGArance identity, ink/plum and ivory palette, responsive catalog, saved scent shortlist, product image uploads, authenticated product/order/settings management. Existing catalog prices and artwork remain illustrative; real sales are not enabled. Browser storage is isolated under `vegarance_` keys.
+
+Before taking real orders: confirm sellable inventory and prices, country/currency and fulfillment policies; connect a payment account and verified webhook; use durable database/upload storage; add transactional email and real shipping/tax rules. The existing free Render filesystem may reset.
+
+## Technical reference
+
+A responsive independent fragrance storefront, with an HTML/CSS/JavaScript frontend and a Node/SQLite backend. Production payment fulfillment remains disconnected. See [RENDER-SETUP.md](RENDER-SETUP.md) for hosting configuration.
 
 ## Preview
 

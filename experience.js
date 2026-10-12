@@ -16,7 +16,7 @@ function openCart(){
 }
 function totals(){
   const subtotal=cart.reduce((n,it)=>n+it.price*it.qty,0);
-  const settings=Store.server?Store.settings:readStore('fmp_settings',{});
+  const settings=Store.server?Store.settings:readStore('vegarance_settings',{});
   const threshold=Number.isFinite(settings?.shipThreshold) ? Math.max(0,settings.shipThreshold) : 75;
   const shipping=subtotal >= threshold ? 0 : 6.95;
   return {subtotal,shipping,total:subtotal+shipping};
@@ -38,13 +38,13 @@ $('#checkoutForm').addEventListener('submit',async e=>{
   if(!form.elements.customer.value.trim()){form.elements.customer.focus();toast('Enter a sample customer name.');return;}
   syncCart(); if(!cart.length){closeOverlays();renderCart();toast('Your cart items are no longer available.');return;}
   let id='DEMO-'+Date.now().toString(36).toUpperCase();
-  const orders=readStore('fmp_demo_orders',[]);
+  const orders=readStore('vegarance_demo_orders',[]);
   let t=totals();
   const submit=form.querySelector('[type="submit"]');submit.disabled=true;
   if(Store.server){try{const order=await Store.request('/api/orders','POST',{state:form.elements.state.value,items:cart.map(({productId,size,qty,baseId,accentId,ratio})=>({productId,size,qty,baseId,accentId,ratio}))});id=order.id;t={...t,total:order.total};}catch(error){toast(error.message);submit.disabled=false;return;}}
   // Do not persist name or email: this public preview needs no personal information.
   const order={id,customer:'Demo customer · '+form.elements.state.value,items:cart.map(it=>`${it.name} (${it.detail}) ×${it.qty}`).join(' · '),total:t.total,date:new Date().toISOString().slice(0,10),demo:true};
-  if(!Store.server)writeStore('fmp_demo_orders',[order,...(Array.isArray(orders)?orders:[])].slice(0,50));
+  if(!Store.server)writeStore('vegarance_demo_orders',[order,...(Array.isArray(orders)?orders:[])].slice(0,50));
   cart=[];renderCart();form.reset();
   $('#checkoutContent').hidden=true;$('#checkoutSuccess').hidden=false;
   $('#orderConfirmation').textContent=`Demo order ${id} · ${money(t.total)} in illustrative pricing.`;
@@ -74,7 +74,7 @@ $('#brandTotal').textContent=`${BRANDS.length} fragrance houses`;
 $('#catalogTotal').textContent=`${PRODUCTS.length} scents to discover`;
 document.querySelectorAll('[data-total-products]').forEach(el=>el.textContent=PRODUCTS.length);
 document.querySelectorAll('[data-total-brands]').forEach(el=>el.textContent=BRANDS.length);
-const settings=Store.server?Store.settings:readStore('fmp_settings',null);
+const settings=Store.server?Store.settings:readStore('vegarance_settings',null);
 if(settings&&typeof settings==='object'){
   if(settings.storeName)document.querySelectorAll('.brand-text').forEach(el=>el.textContent=settings.storeName);
   if(settings.announcement)$('.announce').textContent=settings.announcement+' · Demo preview';

@@ -1,4 +1,4 @@
-/* ═══ The Frag Man Plug — demo admin panel ═══
+/* ═══ VEGArance — demo admin panel ═══
    Separate from the customer storefront. All state persists in localStorage
    so the storefront (app.js) picks it up on load. */
 
@@ -10,10 +10,10 @@ const money = n => '$' + n;
 const load = (k, fb) => { if(Store.server) return fb; try { const v = JSON.parse(localStorage.getItem(k)); return v ?? fb; } catch(e){ return fb; } };
 const save = (k, v) => localStorage.setItem(k, JSON.stringify(v));
 
-let priceOverrides = load('fmp_price_overrides', {});   // {productId: {'3ml':n,'5ml':n,'10ml':n}}
-let stockMap       = load('fmp_stock', {});             // {productId: true/false} (default true)
-let orderStatus    = load('fmp_order_status', {});      // {orderId: status}
-let settings       = load('fmp_settings', null);
+let priceOverrides = load('vegarance_price_overrides', {});   // {productId: {'3ml':n,'5ml':n,'10ml':n}}
+let stockMap       = load('vegarance_stock', {});             // {productId: true/false} (default true)
+let orderStatus    = load('vegarance_order_status', {});      // {orderId: status}
+let settings       = load('vegarance_settings', null);
 
 const effPrice = (p, size) => (priceOverrides[p.id] && priceOverrides[p.id][size] != null)
   ? priceOverrides[p.id][size] : p.prices[size];
@@ -79,13 +79,13 @@ document.addEventListener('change', e=>{
     inp.value = v;
     priceOverrides[pid] = priceOverrides[pid] || {};
     priceOverrides[pid][size] = v;
-    save('fmp_price_overrides', priceOverrides);
+    save('vegarance_price_overrides', priceOverrides);
     toast('Price updated — storefront will show $' + v);
   }
   const sel = e.target.closest('.order-status');
   if(sel){
     orderStatus[sel.dataset.oid] = sel.value;
-    save('fmp_order_status', orderStatus);
+    save('vegarance_order_status', orderStatus);
     renderOrderStats();
     toast('Order ' + sel.dataset.oid + ' → ' + sel.value);
   }
@@ -96,7 +96,7 @@ document.addEventListener('click', e=>{
   if(t){
     const pid = t.dataset.stock;
     stockMap[pid] = !inStock(PRODUCTS.find(p=>p.id===pid));
-    save('fmp_stock', stockMap);
+    save('vegarance_stock', stockMap);
     renderProducts();
     toast(stockMap[pid]===false ? 'Marked out of stock' : 'Back in stock');
   }
@@ -115,8 +115,8 @@ const SAMPLE_ORDERS = [
   {id:'FMP-1034', customer:'Alicia G. · Phoenix, AZ', items:'Custom Hybrid Mix (5ml) ×1 · Rayhaan Azul (3ml) ×1', total:34, date:'2026-10-07'},
   {id:'FMP-1033', customer:'Tom H. · Chicago, IL', items:'Rasasi Hawas Ice (5ml) ×1', total:14, date:'2026-10-07'},
 ];
-const demoOrders = load('fmp_demo_orders', []);
-const deletedOrders = load('fmp_deleted_orders', []);
+const demoOrders = load('vegarance_demo_orders', []);
+const deletedOrders = load('vegarance_deleted_orders', []);
 const ORDERS = [...(Array.isArray(demoOrders) ? demoOrders : []), ...SAMPLE_ORDERS].filter(o=>!deletedOrders.includes(o.id));
 const STATUSES = ['Pending','Processing','Shipped','Delivered','Cancelled'];
 const oStatus = o => o.status || orderStatus[o.id] || (o.demo ? 'Pending' : o.id>='FMP-1041' ? 'Processing' : o.id>='FMP-1038' ? 'Shipped' : 'Delivered');
@@ -148,8 +148,8 @@ function renderOrders(){
 
 /* ── settings ── */
 const DEFAULT_SETTINGS = {
-  storeName: 'The Frag Man Plug',
-  announcement: 'Complimentary US shipping on orders $75+ · Hand-poured in Florida',
+  storeName: 'VEGArance',
+  announcement: 'VEGArance · The art of scent',
   shipThreshold: 75,
   supportEmail: ''
 };
@@ -168,11 +168,11 @@ $('#settingsForm').addEventListener('submit', e=>{
     shipThreshold: Math.max(0, +$('#setShipThreshold').value || 0),
     supportEmail: $('#setSupportEmail').value.trim() || DEFAULT_SETTINGS.supportEmail
   };
-  save('fmp_settings', settings);
+  save('vegarance_settings', settings);
   toast('Settings saved ✓');
 });
 $('#resetDemo').addEventListener('click', ()=>{
-  ['fmp_price_overrides','fmp_stock','fmp_order_status','fmp_settings','fmp_cart','fmp_demo_orders','fmp_catalog','fmp_deleted_orders'].forEach(k=>localStorage.removeItem(k));
+  ['vegarance_price_overrides','vegarance_stock','vegarance_order_status','vegarance_settings','vegarance_cart','vegarance_demo_orders','vegarance_catalog','vegarance_deleted_orders'].forEach(k=>localStorage.removeItem(k));
   priceOverrides = {}; stockMap = {}; orderStatus = {}; settings = null;
   ORDERS.splice(0, ORDERS.length, ...SAMPLE_ORDERS);
   renderProducts(); renderOrders(); renderSettings();

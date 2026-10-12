@@ -33,13 +33,13 @@ form.addEventListener('submit',async e=>{
  if(value.image&&!/^(https:\/\/|images\/|\/uploads\/|data:image\/(png|jpeg|webp);base64,)/.test(value.image)){$('#productError').textContent='Use an HTTPS image URL or upload an image.';return;}
  for(const size of ['3ml','5ml','10ml']){const price=Number(form.elements[size].value);if(!Number.isFinite(price)||price<=0||price>10000){$('#productError').textContent='Each decant price must be above zero and no more than $10,000.';return;}value.prices[size]=Math.round(price*100)/100;}
  $('#productSave').disabled=true;$('#productError').textContent='';
- try{await Store.persist(editingId?'PUT':'POST',editingId,value);if(editingId){delete priceOverrides[editingId];delete stockMap[editingId];if(!Store.server){save('fmp_price_overrides',priceOverrides);save('fmp_stock',stockMap);}}refreshAdmin();closeEditor();toast('Product saved.');}catch(error){$('#productError').textContent=error.message;}finally{$('#productSave').disabled=false;}
+ try{await Store.persist(editingId?'PUT':'POST',editingId,value);if(editingId){delete priceOverrides[editingId];delete stockMap[editingId];if(!Store.server){save('vegarance_price_overrides',priceOverrides);save('vegarance_stock',stockMap);}}refreshAdmin();closeEditor();toast('Product saved.');}catch(error){$('#productError').textContent=error.message;}finally{$('#productSave').disabled=false;}
 });
 let deleteId=null;const deletion=document.getElementById('deleteProductDialog');
 $('#cancelDelete').onclick=()=>deletion.close();
 $('#confirmDelete').onclick=async()=>{
  $('#confirmDelete').disabled=true;$('#deleteError').textContent='';
- try{await Store.persist('DELETE',deleteId);delete priceOverrides[deleteId];delete stockMap[deleteId];if(!Store.server){save('fmp_price_overrides',priceOverrides);save('fmp_stock',stockMap);}refreshAdmin();deletion.close();toast('Product deleted.');}catch(error){$('#deleteError').textContent=error.message;}finally{$('#confirmDelete').disabled=false;}
+ try{await Store.persist('DELETE',deleteId);delete priceOverrides[deleteId];delete stockMap[deleteId];if(!Store.server){save('vegarance_price_overrides',priceOverrides);save('vegarance_stock',stockMap);}refreshAdmin();deletion.close();toast('Product deleted.');}catch(error){$('#deleteError').textContent=error.message;}finally{$('#confirmDelete').disabled=false;}
 };
 document.addEventListener('click',async e=>{
  const orderDelete=e.target.closest('[data-delete-order]');if(orderDelete){pendingOrderDelete=orderDelete.dataset.deleteOrder;$('#deleteOrderName').textContent=pendingOrderDelete;$('#deleteOrderError').textContent='';$('#deleteOrderDialog').showModal();return;}
@@ -68,5 +68,5 @@ let pendingOrderDelete=null;
 $('#cancelOrderDelete').onclick=()=>$('#deleteOrderDialog').close();
 $('#confirmOrderDelete').onclick=async()=>{
  $('#confirmOrderDelete').disabled=true;
- try{if(Store.server)await Store.request('/api/orders/'+encodeURIComponent(pendingOrderDelete),'DELETE');else{const removed=[...deletedOrders,pendingOrderDelete];save('fmp_deleted_orders',removed);deletedOrders.splice(0,deletedOrders.length,...removed);}const index=ORDERS.findIndex(o=>o.id===pendingOrderDelete);if(index>=0)ORDERS.splice(index,1);renderOrders();$('#deleteOrderDialog').close();toast('Demo order deleted.');}catch(error){$('#deleteOrderError').textContent=error.message;}finally{$('#confirmOrderDelete').disabled=false;}
+ try{if(Store.server)await Store.request('/api/orders/'+encodeURIComponent(pendingOrderDelete),'DELETE');else{const removed=[...deletedOrders,pendingOrderDelete];save('vegarance_deleted_orders',removed);deletedOrders.splice(0,deletedOrders.length,...removed);}const index=ORDERS.findIndex(o=>o.id===pendingOrderDelete);if(index>=0)ORDERS.splice(index,1);renderOrders();$('#deleteOrderDialog').close();toast('Demo order deleted.');}catch(error){$('#deleteOrderError').textContent=error.message;}finally{$('#confirmOrderDelete').disabled=false;}
 };

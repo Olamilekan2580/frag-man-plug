@@ -49,7 +49,7 @@ with sync_playwright() as p:
     page.locator('#checkoutForm [type="submit"]').click()
     assert page.locator('#checkoutSuccess').is_visible()
     assert page.locator('#cartCount').inner_text()=='0'
-    orders=page.evaluate("JSON.parse(localStorage.getItem('fmp_demo_orders'))")
+    orders=page.evaluate("JSON.parse(localStorage.getItem('vegarance_demo_orders'))")
     assert len(orders)==1 and 'email' not in orders[0]
     page.locator('#checkoutSuccess [data-close]').click()
     page.locator('#mixSearch').fill('Asad')

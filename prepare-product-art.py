@@ -23,7 +23,7 @@ for index,product in enumerate(products,1):
     small=ImageFont.truetype(str(sans),16)
     brandfont=ImageFont.truetype(str(sans),17)
     titlefont=ImageFont.truetype(str(serif),32)
-    draw.text((40,24),'THE FRAG MAN PLUG',font=small,fill='#394336')
+    draw.text((40,24),'VEGARANCE',font=small,fill='#394336')
     number=f'NO. {index:03}'
     draw.text((728-draw.textlength(number,font=small),24),number,font=small,fill='#787466')
     photo=Image.open(source).convert('RGB')
@@ -50,7 +50,7 @@ for index,product in enumerate(products,1):
         if line:lines.append(line)
     for row,text in enumerate(lines):draw.text((40,790+row*39),text,font=titlefont,fill='#203528')
     draw.text((40,923),'3 ML  /  5 ML  /  10 ML',font=small,fill='#5e6859')
-    note='REPRESENTATIVE DEMO ART'
+    note='REPRESENTATIVE ARTWORK'
     draw.text((728-draw.textlength(note,font=small),923),note,font=small,fill='#7f796a')
     target=output/(product['id']+'.webp')
     canvas.resize((560,700),Image.Resampling.LANCZOS).save(target,'WEBP',quality=83,method=6)
