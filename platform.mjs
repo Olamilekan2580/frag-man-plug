@@ -1,15 +1,17 @@
+import {createMerchantConnections} from './merchant-connections.mjs';
 import {randomBytes, scrypt, timingSafeEqual, createHash} from 'node:crypto';
 import {promisify} from 'node:util';
 const derive=promisify(scrypt), fail=(status,message)=>Object.assign(new Error(message),{status});
 const hash=s=>createHash('sha256').update(s).digest('hex');
 const id=()=>randomBytes(16).toString('hex');
 const text=(value,max,required=false)=>{if(typeof value!=='string'||value.length>max||(required&&!value.trim()))throw fail(422,'Invalid or missing text');return value.trim();};
-export function createPlatform({db,body,send,sameOrigin,now=Date.now}){
+export function createPlatform({db,body,send,sameOrigin,now=Date.now,env=process.env,connectionsFactory=createMerchantConnections}){
  db.exec(`PRAGMA foreign_keys=ON;
  CREATE TABLE IF NOT EXISTS merchants(id TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL,name TEXT NOT NULL,salt TEXT NOT NULL,password_hash TEXT NOT NULL,created_at INTEGER NOT NULL);
  CREATE TABLE IF NOT EXISTS merchant_sessions(token_hash TEXT PRIMARY KEY,merchant_id TEXT NOT NULL REFERENCES merchants(id),expires INTEGER NOT NULL);
  CREATE TABLE IF NOT EXISTS merchant_stores(id TEXT PRIMARY KEY,merchant_id TEXT NOT NULL REFERENCES merchants(id),slug TEXT UNIQUE NOT NULL,document TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS merchant_products(id TEXT PRIMARY KEY,store_id TEXT NOT NULL REFERENCES merchant_stores(id),document TEXT NOT NULL);`);
+ const connections=connectionsFactory({db,env,now});
  const rates=new Map();let hashes=0;
  function limit(req){const key=req.socket.remoteAddress,old=rates.get(key),entry=old&&old.until>now()?old:{count:0,until:now()+60000};rates.set(key,entry);if(++entry.count>10)throw fail(429,'Too many account attempts. Try again in a minute.');if(rates.size>10000)for(const [k,v] of rates)if(v.until<now())rates.delete(k);}
  async function passwordHash(password,salt){if(hashes>=4)throw fail(503,'Account service is busy. Please try again.');hashes++;try{return await derive(password,salt,64);}finally{hashes--;}}
@@ -28,13 +30,23 @@ export function createPlatform({db,body,send,sameOrigin,now=Date.now}){
    if(path.endsWith('signup')){const name=text(input.name,100,true);if(db.prepare('SELECT id FROM merchants WHERE email=?').get(c.email))throw fail(409,'Unable to create this account. Try signing in.');const salt=randomBytes(16).toString('hex'),digest=await passwordHash(c.password,salt),merchant={id:id(),email:c.email,name};try{db.prepare('INSERT INTO merchants VALUES(?,?,?,?,?,?)').run(merchant.id,c.email,name,salt,digest.toString('hex'),now());}catch(e){if(e.code?.startsWith('ERR_SQLITE'))throw fail(409,'Unable to create this account. Try signing in.');throw e;}send(res,201,login(req,res,merchant));
    }else{const m=db.prepare('SELECT * FROM merchants WHERE email=?').get(c.email),digest=await passwordHash(c.password,m?.salt||'missing-account-salt');if(!m||!timingSafeEqual(digest,Buffer.from(m.password_hash,'hex')))throw fail(401,'Incorrect email or password');send(res,200,login(req,res,m));}return true;}
   if(path==='/api/platform/logout'&&method==='POST'){session(req);const token=(req.headers.cookie||'').split(';').map(s=>s.trim()).find(s=>s.startsWith('vegarance_merchant='))?.slice(19);db.prepare('DELETE FROM merchant_sessions WHERE token_hash=?').run(hash(token));cookie(req,res,'',0);send(res,200,{ok:true});return true;}
-  const publicMatch=path.match(/^\/api\/platform\/public\/([a-z0-9-]+)$/);if(publicMatch&&method==='GET'){const row=db.prepare('SELECT id,slug,document FROM merchant_stores WHERE slug=?').get(publicMatch[1]);if(!row||!JSON.parse(row.document).published)throw fail(404,'Store not found');send(res,200,{store:{...JSON.parse(row.document),slug:row.slug},products:products(row.id).filter(p=>p.visible)});return true;}
+  const publicMatch=path.match(/^\/api\/platform\/public\/([a-z0-9-]+)$/);if(publicMatch&&method==='GET'){const row=db.prepare('SELECT id,slug,document FROM merchant_stores WHERE slug=?').get(publicMatch[1]);if(!row||!JSON.parse(row.document).published)throw fail(404,'Store not found');send(res,200,{store:{...JSON.parse(row.document),slug:row.slug},products:products(row.id).filter(p=>p.visible).map(p=>({id:p.id,name:p.name,description:p.description,image:p.image,priceCents:p.priceCents,visible:true,...(p.variants?{variants:p.variants.map(v=>({id:v.id,label:v.label,priceCents:v.priceCents}))}:{})}))});return true;}
   const merchant=session(req);
   if(path==='/api/platform/stores'&&method==='GET'){send(res,200,stores(merchant.id));return true;}
   if(path==='/api/platform/stores'&&method==='POST'){const input=await body(req),slug=text(input.slug,48,true).toLowerCase();if(!/^[a-z0-9](?:[a-z0-9-]{1,46}[a-z0-9])$/.test(slug))throw fail(422,'Store URL must be 3–48 lowercase letters, numbers or hyphens');if(stores(merchant.id).length>=5)throw fail(422,'You can create up to five stores');const cfg=settings({...input,published:false}),storeId=id();try{db.prepare('INSERT INTO merchant_stores VALUES(?,?,?,?)').run(storeId,merchant.id,slug,JSON.stringify(cfg));}catch(e){if(e.code?.startsWith('ERR_SQLITE'))throw fail(409,'That store URL is already taken');throw e;}send(res,201,store(storeId,merchant.id));return true;}
+  const integration=path.match(/^\/api\/platform\/stores\/([a-f0-9]{32})\/(?:connections(?:\/(cj|flutterwave)(?:\/(verify))?)?|suppliers\/cj\/(search|import))$/);
+  if(integration){const cfg=store(integration[1],merchant.id),provider=integration[2];
+   if(integration[4]==='search'&&method==='GET')send(res,200,await connections.search(cfg.id,url.searchParams.get('q')));
+   else if(integration[4]==='import'&&method==='POST')send(res,201,await connections.importDraft(cfg.id,await body(req)));
+   else if(integration[3]==='verify'&&method==='POST')send(res,200,await connections.verify(cfg.id,provider));
+   else if(!provider&&!integration[4]&&method==='GET')send(res,200,connections.status(cfg.id));
+   else if(provider&&!integration[3]&&method==='PUT')send(res,200,connections.save(cfg.id,provider,await body(req)));
+   else if(provider&&!integration[3]&&method==='DELETE')send(res,200,connections.remove(cfg.id,provider));
+   else throw fail(405,'Method not allowed');return true;
+  }
   const match=path.match(/^\/api\/platform\/stores\/([a-f0-9]{32})(?:\/products(?:\/([a-f0-9]{32}))?)?$/);if(!match)throw fail(404,'Unknown platform route');const cfg=store(match[1],merchant.id);
   if(path.endsWith(match[1])){if(method==='GET')send(res,200,{store:cfg,products:products(cfg.id)});else if(method==='PUT'){const updated=settings(await body(req));db.prepare('UPDATE merchant_stores SET document=? WHERE id=? AND merchant_id=?').run(JSON.stringify(updated),cfg.id,merchant.id);send(res,200,store(cfg.id,merchant.id));}else throw fail(405,'Method not allowed');return true;}
-  const productId=match[2];if(productId){const row=db.prepare('SELECT id FROM merchant_products WHERE id=? AND store_id=?').get(productId,cfg.id);if(!row)throw fail(404,'Product not found');if(method==='DELETE'){db.prepare('DELETE FROM merchant_products WHERE id=? AND store_id=?').run(productId,cfg.id);send(res,200,{deleted:true});}else if(method==='PUT'){const p=product(await body(req));db.prepare('UPDATE merchant_products SET document=? WHERE id=? AND store_id=?').run(JSON.stringify(p),productId,cfg.id);send(res,200,{...p,id:productId});}else throw fail(405,'Method not allowed');return true;}
+  const productId=match[2];if(productId){const row=db.prepare('SELECT id,document FROM merchant_products WHERE id=? AND store_id=?').get(productId,cfg.id);if(!row)throw fail(404,'Product not found');if(method==='DELETE'){db.prepare('DELETE FROM merchant_products WHERE id=? AND store_id=?').run(productId,cfg.id);send(res,200,{deleted:true});}else if(method==='PUT'){const existing=JSON.parse(row.document),p={...existing,...product(await body(req))};if(existing.supplier){p.saleReady=false;if(existing.variants)p.priceCents=Math.min(...existing.variants.map(v=>v.priceCents));}db.prepare('UPDATE merchant_products SET document=? WHERE id=? AND store_id=?').run(JSON.stringify(p),productId,cfg.id);send(res,200,{...p,id:productId});}else throw fail(405,'Method not allowed');return true;}
   if(method==='GET')send(res,200,products(cfg.id));else if(method==='POST'){const p=product(await body(req)),productId=id();db.prepare('INSERT INTO merchant_products VALUES(?,?,?)').run(productId,cfg.id,JSON.stringify(p));send(res,201,{...p,id:productId});}else throw fail(405,'Method not allowed');return true;
  }
  return {route};

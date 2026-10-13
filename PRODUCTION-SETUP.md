@@ -87,3 +87,9 @@ npm run test:sales
 ```
 
 The sales browser test imports `test-sales-fixture.mjs` explicitly to mock all outbound providers. Production `npm start` does not import it. Tests never purchase products, charge accounts, send real emails or provision hosting.
+
+## Merchant platform connections
+
+Before inviting merchants, set `PLATFORM_SECRET_KEY` privately in Render to 32 cryptographically random bytes encoded as 64 hex characters. Generate it on a trusted machine, store it in your password manager, and retain it across restarts/deploys. Do not paste it into chat or commit it. Back up this key separately from the encrypted database with restricted access. This key cannot be replaced casually; existing credential records require explicit migration to a new key.
+
+Merchant payment and CJ credentials belong to individual stores and are encrypted in the database. Existing single-store `FLW_*`/`CJ_API_KEY` environment values are not inherited by merchants. Use `/platform.html` to configure connections and import hidden CJ drafts. Merchant checkout remains disabled until per-store order routing, policies/tax, stock checks and payment verification are implemented. Merchant email verification/password recovery and durable storage are also required before commercial onboarding.

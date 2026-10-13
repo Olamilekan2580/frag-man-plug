@@ -16,6 +16,7 @@ export function createPayments({secret=process.env.FLW_SECRET_KEY||'',webhookSec
   };
   return {
     configured,live,provider:'Flutterwave',
+    async checkConnection(){const day=new Date().toISOString().slice(0,10);await request('transactions?'+new URLSearchParams({from:day,to:day,page:'1'}));return true;},
     async checkout(order,site){
       const result=await request('payments',{amount:(order.totalCents/100).toFixed(2),currency:'USD',tx_ref:order.id,
         redirect_url:site+'/order.html?token='+order.token,payment_options:'card',

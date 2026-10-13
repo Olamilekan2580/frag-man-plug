@@ -24,6 +24,8 @@ services:
         value: test
       - key: ADMIN_PASSWORD
         sync: false
+      - key: PLATFORM_SECRET_KEY
+        sync: false
       - key: SITE_URL
         sync: false
       - key: FLW_SECRET_KEY
