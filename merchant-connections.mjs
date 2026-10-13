@@ -3,7 +3,8 @@ import {createCJ} from './cj-client.mjs';
 import {createPayments} from './payment-client.mjs';
 const fail=(status,message)=>Object.assign(new Error(message),{status});
 export function createMerchantConnections({db,env=process.env,cjFactory=createCJ,paymentFactory=createPayments,now=Date.now}){
- db.exec(`CREATE TABLE IF NOT EXISTS merchant_connections(store_id TEXT NOT NULL REFERENCES merchant_stores(id),provider TEXT NOT NULL,envelope TEXT NOT NULL,metadata TEXT NOT NULL,PRIMARY KEY(store_id,provider));`);
+ db.exec(`CREATE TABLE IF NOT EXISTS merchant_connections(store_id TEXT NOT NULL REFERENCES merchant_stores(id),provider TEXT NOT NULL,envelope TEXT NOT NULL,metadata TEXT NOT NULL,PRIMARY KEY(store_id,provider));
+ CREATE TABLE IF NOT EXISTS merchant_payment_bindings(store_id TEXT NOT NULL REFERENCES merchant_stores(id),version TEXT NOT NULL,envelope TEXT NOT NULL,metadata TEXT NOT NULL,PRIMARY KEY(store_id,version));`);
  const key=/^[a-fA-F0-9]{64}$/.test(env.PLATFORM_SECRET_KEY||'')?Buffer.from(env.PLATFORM_SECRET_KEY,'hex'):null;
  const providers=new Set(['cj','flutterwave']),clients=new Map(),busy=new Set(),rates=new Map();
  function requireKey(){if(!key)throw fail(503,'The platform owner must configure PLATFORM_SECRET_KEY before connecting providers');}
@@ -11,7 +12,7 @@ export function createMerchantConnections({db,env=process.env,cjFactory=createCJ
  function seal(storeId,provider,value){requireKey();const iv=randomBytes(12),cipher=createCipheriv('aes-256-gcm',key,iv);cipher.setAAD(aad(storeId,provider));const encrypted=Buffer.concat([cipher.update(JSON.stringify(value),'utf8'),cipher.final()]);return JSON.stringify({version:1,iv:iv.toString('hex'),tag:cipher.getAuthTag().toString('hex'),data:encrypted.toString('hex')});}
  function open(storeId,provider,envelope){requireKey();try{const e=JSON.parse(envelope);if(e.version!==1)throw Error();const decipher=createDecipheriv('aes-256-gcm',key,Buffer.from(e.iv,'hex'));decipher.setAAD(aad(storeId,provider));decipher.setAuthTag(Buffer.from(e.tag,'hex'));return JSON.parse(Buffer.concat([decipher.update(Buffer.from(e.data,'hex')),decipher.final()]).toString());}catch{throw fail(503,'Stored connection could not be opened. Ask the platform owner to check the encryption key.');}}
  const row=(storeId,provider)=>db.prepare('SELECT envelope,metadata FROM merchant_connections WHERE store_id=? AND provider=?').get(storeId,provider);
- function status(storeId){return {storageConfigured:!!key,checkoutEnabled:false,connections:[...providers].map(provider=>{const r=row(storeId,provider);return {provider,connected:!!r,...(r?JSON.parse(r.metadata):{verifiedAt:null}),usable:!!r&&!!key};})};}
+ function status(storeId){return {storageConfigured:!!key,liveCheckoutEnabled:false,connections:[...providers].map(provider=>{const r=row(storeId,provider);return {provider,connected:!!r,...(r?JSON.parse(r.metadata):{verifiedAt:null}),usable:!!r&&!!key};})};}
  function credential(value){if(typeof value!=='string'||!value.trim()||value.length>2000)throw fail(422,'Enter the required provider secret');return value.trim();}
  function save(storeId,provider,input){if(!providers.has(provider))throw fail(404,'Unknown provider');requireKey();if(busy.has(storeId))throw fail(409,'Wait for the current provider operation to finish');let secrets,meta;
   if(provider==='cj'){secrets={apiKey:credential(input.apiKey)};meta={verifiedAt:null,updatedAt:now(),version:randomUUID()};}
@@ -27,5 +28,7 @@ export function createMerchantConnections({db,env=process.env,cjFactory=createCJ
   const draft=await client(storeId,'cj').draft(input.productId,input.category,input.markup),variants=draft.variants.map(v=>({id:v.id,label:v.label,sku:v.sku,priceCents:Math.round(draft.prices[v.id]*100),inStock:false,active:true}));if(!variants.length||variants.some(v=>!Number.isSafeInteger(v.priceCents)||v.priceCents<1||v.priceCents>1000000))throw fail(422,'Supplier prices require manual review');
   const p={name:draft.name,description:'',image:draft.image,priceCents:Math.min(...variants.map(v=>v.priceCents)),visible:false,category:input.category,supplier:draft.supplier,variants,saleReady:false,importedAt:now()},productId=randomBytes(16).toString('hex');db.prepare('INSERT INTO merchant_products VALUES(?,?,?)').run(productId,storeId,JSON.stringify(p));return {...p,id:productId};
  });}
- return {status,save,remove,verify,search,importDraft,stock:(storeId,work)=>operation(storeId,()=>work(client(storeId,'cj')))};
+ function paymentBinding(storeId){const r=row(storeId,'flutterwave');if(!r)throw fail(422,'Connect Flutterwave first');open(storeId,'flutterwave',r.envelope);const metadata=JSON.parse(r.metadata);db.prepare('INSERT OR IGNORE INTO merchant_payment_bindings VALUES(?,?,?,?)').run(storeId,metadata.version,r.envelope,r.metadata);return metadata;}
+ function paymentClient(storeId,version){let r=db.prepare('SELECT envelope FROM merchant_payment_bindings WHERE store_id=? AND version=?').get(storeId,version);if(!r){const current=row(storeId,'flutterwave');if(current&&JSON.parse(current.metadata).version===version)r=current;}if(!r)throw fail(503,'Order payment connection is unavailable');return paymentFactory(open(storeId,'flutterwave',r.envelope));}
+ return {status,save,remove,verify,search,importDraft,paymentBinding,withPayment:(storeId,version,work)=>operation(storeId,()=>work(paymentClient(storeId,version))),stock:(storeId,work)=>operation(storeId,()=>work(client(storeId,'cj')))};
 }

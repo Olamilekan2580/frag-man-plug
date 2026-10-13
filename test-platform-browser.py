@@ -4,7 +4,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 os.chdir(Path(__file__).parent)
 with tempfile.TemporaryDirectory(prefix='vega-platform-ui-') as data:
-    process=subprocess.Popen(['node','--import','./test-platform-provider-fixture.mjs','server.mjs'],env={**os.environ,'PORT':'0','HOST':'127.0.0.1','DATA_DIR':data,'ADMIN_PASSWORD':'platform-test-owner-password','PLATFORM_SECRET_KEY':'ab'*32},stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+    process=subprocess.Popen(['node','--import','./test-platform-provider-fixture.mjs','server.mjs'],env={**os.environ,'PORT':'0','HOST':'127.0.0.1','DATA_DIR':data,'ADMIN_PASSWORD':'platform-test-owner-password','PLATFORM_SECRET_KEY':'ab'*32,'SITE_URL':'https://platform.example.com','DURABLE_STORAGE_CONFIRMED':'true'},stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
     try:
         base='http://127.0.0.1:'+process.stdout.readline().strip().split()[-1]
         with sync_playwright() as pw:
@@ -21,7 +21,7 @@ with tempfile.TemporaryDirectory(prefix='vega-platform-ui-') as data:
             page.locator('#logout').click();page.locator('#account').wait_for(state='visible');f=page.locator('#login');f.locator('[name=email]').fill('browser@example.com');f.locator('[name=password]').fill('a-private-browser-password');f.locator('button').click();page.locator('#dashboard').wait_for(state='visible');page.locator('#stores button').click();page.locator('#editor').wait_for(state='visible');assert '$32.50' in page.locator('#products').inner_text();
             page.locator('#cjConnection [name=apiKey]').fill('private-cj-browser-key');page.locator('#cjConnection button').first.click();page.wait_for_function("document.getElementById('connectionStatus').textContent.includes('CJ: Saved')");assert page.locator('#cjConnection [name=apiKey]').input_value()==''
             page.locator('[data-verify=cj]').click();page.wait_for_function("document.getElementById('connectionStatus').textContent.includes('CJ: Read access checked')")
-            form=page.locator('#paymentConnection');form.locator('[name=secret]').fill('FLWSECK_TEST-browser-secret');form.locator('[name=webhookSecret]').fill('private-browser-webhook');form.locator('button').first.click();page.wait_for_function("document.getElementById('connectionStatus').textContent.includes('FLUTTERWAVE: Saved')");assert form.locator('[name=secret]').input_value()==''
+            form=page.locator('#paymentConnection');form.locator('[name=secret]').fill('FLWSECK_TEST-browser-secret');form.locator('[name=webhookSecret]').fill('private-browser-webhook');form.locator('[name=usdApproved]').check();form.locator('button').first.click();page.wait_for_function("document.getElementById('connectionStatus').textContent.includes('FLUTTERWAVE: Saved')");assert form.locator('[name=secret]').input_value()==''
             page.locator('[data-verify=flutterwave]').click();page.wait_for_function("document.getElementById('connectionStatus').textContent.includes('FLUTTERWAVE: Read access checked')")
             page.locator('#supplierSearch [name=query]').fill('shirt');page.locator('#supplierSearch button').click();page.locator('#supplierResults button').wait_for();page.locator('#supplierResults button').click();page.wait_for_function("document.getElementById('products').textContent.includes('Supplier Test Shirt')");assert page.locator('#products .row').count()==2;assert 'Hidden' in page.locator('#products').inner_text()
             page.locator('#products .row').filter(has_text='Supplier Test Shirt').locator('[data-edit]').click();assert page.locator('#product [name=price]').is_disabled();page.locator('#product [name=description]').fill('Reviewed supplier description.');page.locator('#product button').first.click();page.wait_for_function("document.getElementById('message').textContent==='Product saved.'")
@@ -34,9 +34,25 @@ with tempfile.TemporaryDirectory(prefix='vega-platform-ui-') as data:
             guest.route('https://images.example.invalid/**',lambda route:route.abort())
             shop.reload(wait_until='domcontentloaded');shop.wait_for_function("document.querySelectorAll('#shopProducts article').length===2");supplier=shop.locator('#shopProducts article').filter(has_text='Supplier Test Shirt');assert 'Medium · $25.00 · Available' in supplier.inner_text()
 
+            page.locator('#settings [name=supportEmail]').fill('help@example.com');page.locator('#settings button').click();page.wait_for_function("document.getElementById('message').textContent==='Store saved.'")
+            sales=page.locator('#merchantSales')
+            for field,text in {'shippingPolicy':'Reviewed test shipping policy with actual delivery and processing details.','returnPolicy':'Reviewed test return policy with clear conditions for customers.','privacyPolicy':'Reviewed test privacy policy explaining how customer information is handled.','terms':'Reviewed test terms describing the customer checkout and order process.'}.items():sales.locator('[name='+field+']').fill(text)
+            sales.locator('[name=taxRates]').fill('{"FL":6}');sales.locator('[name=taxReviewed]').check();sales.locator('[name=enabled]').check();sales.locator('button').click();page.wait_for_function("document.getElementById('message').textContent==='Checkout settings saved.'")
+            assert '/api/platform/webhooks/flutterwave/' in page.locator('#merchantWebhook').input_value()
+            guest.route('https://checkout.flutterwave.com/**',lambda route:route.fulfill(status=200,body='<html><body>Mock Flutterwave test checkout</body></html>',content_type='text/html'))
+            shop.reload(wait_until='domcontentloaded');shop.locator('[data-add]').wait_for();shop.locator('[data-add]').click();assert '$25.00' in shop.locator('#merchantCart').inner_text()
+            buyer=shop.locator('#merchantCheckout')
+            for field,value in {'name':'Test Buyer','email':'customer@example.com','phone':'3055551234','line1':'123 Test Street','city':'Miami','zip':'33101'}.items():buyer.locator('[name='+field+']').fill(value)
+            buyer.locator('[name=state]').select_option('FL');shop.locator('#quoteMerchant').click();shop.locator('#shippingChoices label').wait_for();assert '$33.87' in shop.locator('#shippingChoices').inner_text();assert shop.evaluate('document.documentElement.scrollWidth<=innerWidth')
+            buyer.locator('[name=consent]').check();shop.locator('#payMerchant').click();shop.wait_for_url('https://checkout.flutterwave.com/**')
+            shop.goto(base+'/shops/browser-shop',wait_until='domcontentloaded');token=shop.evaluate("sessionStorage.getItem('vegarance_merchant_pending:browser-shop')");assert token
+            shop.goto(base+'/merchant-order.html?token='+token+'&status=successful',wait_until='domcontentloaded');shop.wait_for_function("document.getElementById('merchantOrder').textContent.includes('Paid test order')");assert '$33.87' in shop.locator('#merchantOrder').inner_text();assert shop.evaluate("localStorage.getItem('vegarance_merchant_cart:browser-shop')")=='[]'
+            page.locator('#reloadMerchantOrders').click();page.locator('[data-merchant-order]').wait_for();assert 'customer@example.com' in page.locator('#merchantOrders').inner_text();assert 'Paid test order' in page.locator('#merchantOrders').inner_text()
+            for width in [320,390,768,1440]:
+                shop.set_viewport_size({'width':width,'height':900});assert shop.evaluate('document.documentElement.scrollWidth<=innerWidth'),width
             for width in [320,390,768,1440]:
                 page.set_viewport_size({'width':width,'height':900});assert page.evaluate('document.documentElement.scrollWidth<=innerWidth'),width
             assert not errors,errors
-            browser.close();print('PASS: signup, store creation, branding, product create/edit, publishing, guest storefront, logout/login and private connections, mocked read checks, hidden CJ import, stock checks, option pricing, review approval and four responsive widths; no browser errors.')
+            browser.close();print('PASS: signup, store creation, branding, product create/edit, publishing, guest storefront, logout/login and private connections, mocked read checks, hidden CJ import, stock checks, option pricing, review approval, merchant checkout, shipping/tax, Flutterwave redirect, verified private order, cart clearing, merchant orders and four responsive widths; no browser errors.')
     finally:
         process.terminate();process.wait(timeout=10)

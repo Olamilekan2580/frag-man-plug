@@ -17,6 +17,8 @@ try{await start();assert.equal((await req(api+'stores')).status,401);assert.equa
  assert.equal((await req(api+'stores/'+sid+'/connections','GET',undefined,b.cookie)).status,404);
  assert.equal((await req(api+'stores/'+sid+'/connections/cj','PUT',{apiKey:'private-cj-a'},b.cookie)).status,404);
  const conn=await req(api+'stores/'+sid+'/connections/cj','PUT',{apiKey:'private-cj-a'},a.cookie);assert.equal(conn.status,200);assert.ok(!JSON.stringify(conn.data).includes('private-cj-a'));assert.equal(conn.data.connections.find(c=>c.provider==='cj').connected,true);
+ assert.equal((await req(api+'stores/'+sid+'/sales','GET',undefined,b.cookie)).status,404);assert.equal((await req(api+'stores/'+sid+'/orders','GET',undefined,b.cookie)).status,404);assert.equal((await req(api+'stores/'+sid+'/sales','GET',undefined,a.cookie)).status,200);
+ assert.equal((await req(api+'public/first-store/quote','POST',{items:[],address:{}},a.cookie)).status,503);
  assert.equal((await req(api+'stores/'+sid+'/inventory','GET',undefined,b.cookie)).status,404);
  assert.equal((await req(api+'stores/'+sid+'/inventory/sync','POST',{},b.cookie)).status,404);
  assert.equal((await req(api+'stores/'+sid+'/inventory/settings','PUT',{enabled:true,intervalMinutes:60},b.cookie)).status,404);

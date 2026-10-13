@@ -17,11 +17,11 @@ export function createPayments({secret=process.env.FLW_SECRET_KEY||'',webhookSec
   return {
     configured,live,provider:'Flutterwave',
     async checkConnection(){const day=new Date().toISOString().slice(0,10);await request('transactions?'+new URLSearchParams({from:day,to:day,page:'1'}));return true;},
-    async checkout(order,site){
+    async checkout(order,site,{redirectPath='/order.html',title='VEGArance'}={}){
       const result=await request('payments',{amount:(order.totalCents/100).toFixed(2),currency:'USD',tx_ref:order.id,
-        redirect_url:site+'/order.html?token='+order.token,payment_options:'card',
+        redirect_url:site+redirectPath+'?token='+order.token,payment_options:'card',
         customer:{email:order.email,name:order.address.name,phonenumber:order.address.phone},
-        customizations:{title:'VEGArance',description:'Order '+order.id},
+        customizations:{title,description:'Order '+order.id},
         configurations:{session_duration:30},meta:{orderId:order.id}});
       if(!/^https:\/\/checkout\.flutterwave\.com\//.test(result.link||''))throw Object.assign(new Error('Payment provider returned an invalid checkout'),{status:502});
       return {id:order.id,url:result.link};
