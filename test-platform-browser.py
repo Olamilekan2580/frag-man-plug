@@ -23,6 +23,7 @@ with tempfile.TemporaryDirectory(prefix='vega-platform-ui-') as data:
             page.locator('[data-verify=cj]').click();page.wait_for_function("document.getElementById('connectionStatus').textContent.includes('CJ: Read access checked')")
             form=page.locator('#paymentConnection');form.locator('[name=secret]').fill('FLWSECK_TEST-browser-secret');form.locator('[name=webhookSecret]').fill('private-browser-webhook');form.locator('[name=usdApproved]').check();form.locator('button').first.click();page.wait_for_function("document.getElementById('connectionStatus').textContent.includes('FLUTTERWAVE: Saved')");assert form.locator('[name=secret]').input_value()==''
             page.locator('[data-verify=flutterwave]').click();page.wait_for_function("document.getElementById('connectionStatus').textContent.includes('FLUTTERWAVE: Read access checked')")
+            email=page.locator('#emailConnection');email.locator('[name=key]').fill('private-resend-test-key');email.locator('[name=from]').fill('Browser Shop <orders@example.com>');email.locator('button').first.click();page.wait_for_function("document.getElementById('connectionStatus').textContent.includes('RESEND: Saved')");assert email.locator('[name=key]').input_value()=='';page.locator('[data-verify=resend]').click();page.wait_for_function("document.getElementById('connectionStatus').textContent.includes('RESEND: Read access checked')")
             page.locator('#supplierSearch [name=query]').fill('shirt');page.locator('#supplierSearch button').click();page.locator('#supplierResults button').wait_for();page.locator('#supplierResults button').click();page.wait_for_function("document.getElementById('products').textContent.includes('Supplier Test Shirt')");assert page.locator('#products .row').count()==2;assert 'Hidden' in page.locator('#products').inner_text()
             page.locator('#products .row').filter(has_text='Supplier Test Shirt').locator('[data-edit]').click();assert page.locator('#product [name=price]').is_disabled();page.locator('#product [name=description]').fill('Reviewed supplier description.');page.locator('#product button').first.click();page.wait_for_function("document.getElementById('message').textContent==='Product saved.'")
             page.locator('#checkStock').click();page.wait_for_function("document.getElementById('inventoryStatus').textContent.includes('done')")
@@ -48,11 +49,21 @@ with tempfile.TemporaryDirectory(prefix='vega-platform-ui-') as data:
             shop.goto(base+'/shops/browser-shop',wait_until='domcontentloaded');token=shop.evaluate("sessionStorage.getItem('vegarance_merchant_pending:browser-shop')");assert token
             shop.goto(base+'/merchant-order.html?token='+token+'&status=successful',wait_until='domcontentloaded');shop.wait_for_function("document.getElementById('merchantOrder').textContent.includes('Paid test order')");assert '$33.87' in shop.locator('#merchantOrder').inner_text();assert shop.evaluate("localStorage.getItem('vegarance_merchant_cart:browser-shop')")=='[]'
             page.locator('#reloadMerchantOrders').click();page.locator('[data-merchant-order]').wait_for();assert 'customer@example.com' in page.locator('#merchantOrders').inner_text();assert 'Paid test order' in page.locator('#merchantOrders').inner_text()
+            assert page.locator('[data-order-action=dispatch]').count()==0 and page.locator('[data-order-action=fund]').count()==0
+            page.once('dialog',lambda d:d.accept());page.locator('[data-order-action=refund]').click();page.wait_for_function("document.getElementById('merchantOrders').textContent.includes('Refund pending')")
+            import time
+            for _ in range(25):
+                page.locator('#reloadMerchantOrders').click()
+                if 'Refunded' in page.locator('#merchantOrders').inner_text() and 'accepted' in page.locator('#merchantEmailJobs').inner_text():break
+                time.sleep(2)
+            page.wait_for_function("document.getElementById('merchantOrders').textContent.includes('Refunded')")
+            assert 'accepted' in page.locator('#merchantEmailJobs').inner_text();assert page.locator('[data-order-action=refund]').count()==0
+            shop.locator('#refreshMerchantOrder').click();shop.wait_for_function("document.getElementById('merchantOrder').textContent.includes('Refunded')")
             for width in [320,390,768,1440]:
                 shop.set_viewport_size({'width':width,'height':900});assert shop.evaluate('document.documentElement.scrollWidth<=innerWidth'),width
             for width in [320,390,768,1440]:
                 page.set_viewport_size({'width':width,'height':900});assert page.evaluate('document.documentElement.scrollWidth<=innerWidth'),width
             assert not errors,errors
-            browser.close();print('PASS: signup, store creation, branding, product create/edit, publishing, guest storefront, logout/login and private connections, mocked read checks, hidden CJ import, stock checks, option pricing, review approval, merchant checkout, shipping/tax, Flutterwave redirect, verified private order, cart clearing, merchant orders and four responsive widths; no browser errors.')
+            browser.close();print('PASS: signup, store creation, branding, product create/edit, publishing, guest storefront, logout/login and private connections, mocked read checks, hidden CJ import, stock checks, option pricing, review approval, merchant checkout, shipping/tax, Flutterwave redirect, verified private order, cart clearing, merchant orders, verified email sender, receipt/refund jobs, reconciled test refunds, supplier-action blocking and four responsive widths; no browser errors.')
     finally:
         process.terminate();process.wait(timeout=10)
