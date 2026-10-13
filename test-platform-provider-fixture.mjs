@@ -5,6 +5,7 @@ globalThis.fetch=async(url,options={})=>{
  if(target.hostname!=='developers.cjdropshipping.com')throw new Error('Unexpected outbound test request');
  if(target.pathname.endsWith('/authentication/getAccessToken'))return ok({accessToken:'mock-cj-token',accessTokenExpiryDate:new Date(Date.now()+3600000).toISOString()});
  if(target.pathname.endsWith('/product/listV2'))return ok({totalRecords:1,content:[{productList:[{id:'fixture-shirt',nameEn:'Supplier Test Shirt',bigImage:'',sellPrice:10,warehouseInventoryNum:20,oneCategoryName:'Fashion'}]}]});
+ if(target.pathname.endsWith('/product/variant/queryByVid'))return ok({vid:target.searchParams.get('vid'),variantSellPrice:target.searchParams.get('vid')==='fixture-medium'?10:12,inventories:[{countryCode:'US',verifiedWarehouse:'1',totalInventory:20}]});
  if(target.pathname.endsWith('/product/query'))return ok({productNameEn:'Supplier Test Shirt',bigImage:'',variants:[{vid:'fixture-medium',variantKey:'Medium',variantSku:'FIX-M',variantSellPrice:10},{vid:'fixture-large',variantKey:'Large',variantSku:'FIX-L',variantSellPrice:12}]});
  throw new Error('Unexpected CJ test endpoint');
 };

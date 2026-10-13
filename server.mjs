@@ -49,7 +49,7 @@ function publicLimit(req){
  if(publicRates.size>10000)for(const [key,value] of publicRates)if(value.until<Date.now())publicRates.delete(key);
  if(entry.count>30)throw fail(429,'Too many requests. Please try again in a minute.');
 }
-const platform=createPlatform({db,body,send,sameOrigin});
+const platform=createPlatform({db,body,send,sameOrigin});platform.start();
 const mime={'.html':'text/html; charset=utf-8','.css':'text/css','.js':'text/javascript','.svg':'image/svg+xml','.webp':'image/webp','.png':'image/png','.jpg':'image/jpeg','.ttf':'font/ttf'};
 const server=http.createServer(async(req,res)=>{
  res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','same-origin');res.setHeader('X-Frame-Options','DENY');

@@ -1,0 +1,31 @@
+import {randomUUID} from 'node:crypto';
+const fail=(status,message)=>Object.assign(new Error(message),{status});
+export function createMerchantInventory({db,connections,now=Date.now}){
+ db.exec(`CREATE TABLE IF NOT EXISTS merchant_inventory_config(store_id TEXT PRIMARY KEY REFERENCES merchant_stores(id),document TEXT NOT NULL);
+ CREATE TABLE IF NOT EXISTS merchant_inventory_jobs(id TEXT PRIMARY KEY,store_id TEXT NOT NULL REFERENCES merchant_stores(id),document TEXT NOT NULL);`);
+ const config=storeId=>({enabled:false,intervalMinutes:60,...JSON.parse(db.prepare('SELECT document FROM merchant_inventory_config WHERE store_id=?').get(storeId)?.document||'{}')});
+ const jobs=storeId=>db.prepare('SELECT document FROM merchant_inventory_jobs WHERE store_id=? ORDER BY rowid DESC LIMIT 10').all(storeId).map(r=>JSON.parse(r.document));
+ const version=storeId=>connections.status(storeId).connections.find(c=>c.provider==='cj'&&c.connected&&c.usable)?.version||null;
+ const save=j=>db.prepare('INSERT INTO merchant_inventory_jobs VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET document=excluded.document').run(j.id,j.storeId,JSON.stringify(j));
+ for(const row of db.prepare('SELECT document FROM merchant_inventory_jobs').all()){const j=JSON.parse(row.document);if(j.state==='running'){j.state='queued';j.nextAt=now();save(j);}}
+ const linked=storeId=>db.prepare('SELECT id,document FROM merchant_products WHERE store_id=?').all(storeId).map(r=>({...JSON.parse(r.document),id:r.id})).filter(p=>p.supplier?.provider==='cj'&&p.variants?.length);
+ let busy=false,timer;
+ function configure(storeId,input){if(typeof input.enabled!=='boolean'||!Number.isInteger(input.intervalMinutes)||input.intervalMinutes<30||input.intervalMinutes>1440)throw fail(422,'Choose an interval between 30 minutes and 24 hours');if(input.enabled&&!version(storeId))throw fail(422,'Connect CJ before enabling stock checks');const cfg={enabled:input.enabled,intervalMinutes:input.intervalMinutes};db.prepare('INSERT INTO merchant_inventory_config VALUES(?,?) ON CONFLICT(store_id) DO UPDATE SET document=excluded.document').run(storeId,JSON.stringify(cfg));return status(storeId);}
+ function enqueue(storeId){const connectionVersion=version(storeId);if(!connectionVersion)throw fail(422,'Connect CJ before checking stock');const pending=jobs(storeId).find(j=>['queued','running','retry'].includes(j.state));if(pending)return pending;const list=linked(storeId);if(!list.length)throw fail(422,'Import a supplier product first');if(list.reduce((n,p)=>n+p.variants.length,0)>500)throw fail(422,'This stock worker supports up to 500 supplier options per store');const j={id:randomUUID(),storeId,state:'queued',connectionVersion,attempts:0,createdAt:now(),nextAt:now(),result:null};save(j);return j;}
+ function available(storeId,p,v){return !!v.active&&p.supplierSync?.status==='synced'&&p.supplierSync.staleAfter>now()&&p.supplierSync.connectionVersion===version(storeId)&&Number.isSafeInteger(v.quantity)&&v.quantity>0&&Number.isSafeInteger(v.costCents)&&v.costCents>0&&v.priceCents>v.costCents;}
+ function approved(storeId,p){return p.saleReady===true&&p.variants?.some(v=>available(storeId,p,v))===true;}
+ function status(storeId){return {config:config(storeId),linkedProducts:linked(storeId).length,jobs:jobs(storeId)};}
+ async function run(){if(busy)return;const job=db.prepare('SELECT document FROM merchant_inventory_jobs ORDER BY rowid').all().map(r=>JSON.parse(r.document)).find(j=>['queued','retry'].includes(j.state)&&j.nextAt<=now());if(!job)return;busy=true;job.state='running';job.attempts++;save(job);const result={products:0,options:0,unavailable:0,errors:0};
+  try{if(version(job.storeId)!==job.connectionVersion)throw fail(409,'CJ connection changed; enqueue a new stock check');await connections.stock(job.storeId,async cj=>{
+   for(const snapshot of linked(job.storeId)){const updates=new Map();for(const v of snapshot.variants){try{const stock=await cj.variant(v.id);if(!Number.isFinite(stock.cost)||stock.cost<=0||!Number.isSafeInteger(Math.ceil(stock.cost*100))||!Number.isSafeInteger(stock.quantity)||stock.quantity<0)throw Error('Malformed supplier stock');updates.set(v.id,{quantity:stock.quantity,costCents:Math.ceil(stock.cost*100)});result.options++;}catch{updates.set(v.id,null);result.errors++;}}
+    const row=db.prepare('SELECT document FROM merchant_products WHERE id=? AND store_id=?').get(snapshot.id,job.storeId);if(!row)continue;const p=JSON.parse(row.document);if(p.supplier?.productId!==snapshot.supplier.productId)continue;let error=false;
+    p.variants=p.variants.map(v=>{const stock=updates.get(v.id);if(!stock){error=true;result.unavailable++;return {...v,quantity:0,inStock:false};}const inStock=stock.quantity>0&&v.priceCents>stock.costCents&&v.active!==false;if(!inStock)result.unavailable++;return {...v,...stock,active:v.active!==false,inStock};});
+    p.supplierSync={checkedAt:now(),staleAfter:now()+config(job.storeId).intervalMinutes*3*60000,status:error?'needs_attention':'synced',connectionVersion:job.connectionVersion};if(error)p.saleReady=false;
+    db.prepare('UPDATE merchant_products SET document=? WHERE id=? AND store_id=?').run(JSON.stringify(p),snapshot.id,job.storeId);result.products++;
+   }
+  });job.state=result.errors?(job.attempts<3?'retry':'failed'):'done';job.result=result;job.finishedAt=now();job.nextAt=now()+job.attempts*60000;
+  }catch(e){job.state=e.status===409?'failed':job.attempts<3?'retry':'failed';job.result={...result,errors:result.errors+1};job.error=e.status===409?'CJ connection changed. Start a new stock check.':'Stock check failed. Review your CJ connection and retry.';job.nextAt=now()+job.attempts*60000;}finally{save(job);busy=false;}
+ }
+ async function tick(){for(const row of db.prepare('SELECT store_id FROM merchant_inventory_config').all()){const cfg=config(row.store_id),latest=jobs(row.store_id)[0];if(cfg.enabled&&version(row.store_id)&&linked(row.store_id).length&&(!latest||now()-latest.createdAt>=cfg.intervalMinutes*60000))try{enqueue(row.store_id);}catch{}}await run();}
+ return {config,configure,enqueue,run,tick,status,available,approved,start(){timer=setInterval(()=>tick().catch(()=>{}),10000);timer.unref();tick().catch(()=>{});},stop(){clearInterval(timer);}};
+}

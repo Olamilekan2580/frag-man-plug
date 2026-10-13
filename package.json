@@ -7,7 +7,7 @@
     "start": "node server.mjs",
     "test:api": "node test-api.mjs",
     "build": "node build.mjs",
-    "test": "node test-api.mjs && node test-cj.mjs && node test-sync.mjs && node test-commerce.mjs && node test-backup.mjs && node test-platform.mjs && node test-merchant-connections.mjs",
+    "test": "node test-api.mjs && node test-cj.mjs && node test-sync.mjs && node test-commerce.mjs && node test-backup.mjs && node test-platform.mjs && node test-merchant-connections.mjs && node test-merchant-inventory.mjs",
     "test:browser": "python3 test-demo.py && python3 test-crud-layout.py",
     "test:sales": "python3 test-sales-browser.py",
     "backup": "node backup.mjs",
