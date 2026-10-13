@@ -1,0 +1,40 @@
+# Reviewable production blueprint. Applying it provisions paid hosting and disk.
+services:
+  - type: web
+    name: vegarance-store
+    runtime: node
+    plan: starter
+    buildCommand: npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    disk:
+      name: vegarance-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: HOST
+        value: "0.0.0.0"
+      - key: DATA_DIR
+        value: /var/data
+      - key: DURABLE_STORAGE_CONFIRMED
+        value: "true"
+      - key: FLW_MODE
+        value: test
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SITE_URL
+        sync: false
+      - key: FLW_SECRET_KEY
+        sync: false
+      - key: FLW_SECRET_HASH
+        sync: false
+      - key: FLW_USD_APPROVED
+        value: "false"
+      - key: CJ_API_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false

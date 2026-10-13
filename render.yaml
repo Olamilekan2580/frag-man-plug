@@ -3,7 +3,7 @@ services:
     name: frag-man-plug-store
     runtime: node
     plan: free
-    buildCommand: node --check server.mjs
+    buildCommand: npm run build
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
@@ -11,6 +11,8 @@ services:
         value: "24"
       - key: HOST
         value: "0.0.0.0"
+      - key: SITE_URL
+        value: https://frag-man-plug-store.onrender.com
       - key: ADMIN_PASSWORD
         sync: false
 # Free demo: SQLite and uploaded files reset on Render restarts/redeploys.

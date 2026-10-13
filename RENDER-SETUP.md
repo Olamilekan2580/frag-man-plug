@@ -1,3 +1,5 @@
+For the production Flutterwave/CJ setup, follow [PRODUCTION-SETUP.md](PRODUCTION-SETUP.md). The instructions below describe the earlier free preview service.
+
 # Create the free Node demo service
 
 The current `frag-man-plug-demo.onrender.com` service is a static site. Updating its files does not start the Node backend. Create a separate **Web Service** for the server-backed version.
@@ -5,7 +7,7 @@ The current `frag-man-plug-demo.onrender.com` service is a static site. Updating
 1. In Render, select **New → Web Service** and connect `Olamilekan2580/frag-man-plug`.
 2. Branch: `main`. Runtime: Node. Root directory: leave blank.
 3. Name: `frag-man-plug-store` (or another available name).
-4. Build command: `node --check server.mjs`.
+4. Build command: `npm run build`.
 5. Start command: `npm start`.
 6. Instance type: **Free**. Do not attach a paid disk.
 7. Environment variables:

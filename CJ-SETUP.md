@@ -1,5 +1,7 @@
 # VEGArance × CJ — United States
 
+Production fulfillment now has owner-controlled CJ submission/funding, freight quotes and tracking in Sales & connections. Activation and live account validation are pending; see [PRODUCTION-SETUP.md](PRODUCTION-SETUP.md). The discovery/sync instructions below remain applicable.
+
 The owner selected a custom storefront and CJ API, selling first in the US. The owner-only connector searches CJ's US inventory and prepares product drafts using real supplier pictures and option IDs. Drafts start unavailable; markup is applied to supplier product cost and does not include shipping, fees or taxes. Review the draft before saving.
 
 1. Create/sign into your CJ account.
@@ -15,6 +17,6 @@ Stock/cost automation is implemented behind owner controls. In Products → Inve
 
 Missing/failed/stale supplier data blocks checkout. Freshness expires after three configured sync intervals. Supplier costs are kept in a private table; catalog prices are public. Owner edits are re-read before applying results. The job queue resumes interrupted reads if the database survives; free Render restart/redeploy can delete the database. The server only processes timers while awake, so free-service sleeping prevents reliable continuous sync.
 
-Still required for end-to-end automation: durable database and continuously running worker, shipping quotes, verified payments, idempotent supplier order dispatch, supplier purchase funding, tracking sync and customer notifications. No supplier purchasing endpoints are connected in this release.
+Still required for end-to-end automation: durable database and continuously running worker, shipping quotes, verified payments, idempotent supplier order dispatch, supplier purchase funding, tracking sync and customer notifications. Supplier creation/funding adapters are implemented for reviewed, verified paid orders; they remain inactive until production accounts are configured.
 
 Official references: [Authentication](https://developers.cjdropshipping.com/en/api/api2/api/auth.html), [Products and variants](https://developers.cjdropshipping.com/en/api/api2/api/product.html).

@@ -1,5 +1,6 @@
 /* Shared catalog persistence: authenticated API when served by Node, browser demo otherwise. */
 const Store={
+  commerce:typeof SERVER_COMMERCE!=='undefined'?SERVER_COMMERCE:null,
   server:document.querySelector('meta[name="store-mode"]')?.content==='server',
   settings:typeof SERVER_SETTINGS!=='undefined'?SERVER_SETTINGS:null,
   async request(path,method='GET',value){

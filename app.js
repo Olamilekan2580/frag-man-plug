@@ -67,8 +67,8 @@ function cardHTML(p){
       <h3>${esc(p.name)}</h3>
       <p class="card-notes">${esc(categoryOf(p))} · ${optionsOf(p).length} options</p>
       <div class="card-foot">
-        <span class="card-price">${money(startingPrice(p))}<small>From · preview price</small></span>
-        <button class="card-btn" data-view="${p.id}" aria-label="Choose size for ${esc(p.name)}">Choose size ↗</button>
+        <span class="card-price">${money(startingPrice(p))}<small>${Store.commerce?.salesEnabled?'From':'From · preview price'}</small></span>
+        <button class="card-btn" data-view="${p.id}" aria-label="Choose options for ${esc(p.name)}">Choose options ↗</button>
       </div>
     </div>
   </article>`;
@@ -130,13 +130,14 @@ function openProduct(id){
   pmProduct = p; const options=optionsOf(p);pmSize=options.find(v=>v.id==='5ml'&&v.inStock)?.id||options.find(v=>v.inStock)?.id||options[0].id;
   $('#pmEyebrow').textContent = famLabel(p);
   $('#pmName').textContent = p.name;
+  if(Store.commerce?.salesEnabled){document.querySelector('.pm-info h5').textContent='Choose your option';}
   $('#pmMono').textContent = p.mono;
   const pmImg = $('#pmImg');
   pmImg.src = brandImg(p); pmImg.alt = p.name;
   pmImg.style.display = ''; pmImg.onerror = ()=>{ pmImg.style.display='none'; };
   $('#pmDesc').textContent = p.blurb || (categoryOf(p)==='Fragrance'?'Explore this fragrance in a discovery size.':'Discover the details and choose your preferred option.');
   $('#pmBadges').innerHTML = (p.badges || []).map(b=>`<span class="pm-badge">✦ ${b}</span>`).join('') +
-    `<span class="pm-badge demo">demo price</span>`;
+    `${Store.commerce?.salesEnabled?'':'<span class="pm-badge demo">demo price</span>'}`;
   $('#pmSizes').innerHTML = options.map(s=>
     `<button data-size="${esc(s.id)}" ${s.inStock?'':'disabled'} class="${s.id===pmSize?'active':''}">${esc(s.label)}<small>${s.inStock?money(p.prices[s.id]):'Unavailable'}</small></button>`).join('');
   $('#pmPrice').textContent = money(p.prices[pmSize]);
@@ -244,7 +245,7 @@ document.addEventListener('click', e=>{
     activeBrand = chip.dataset.brand; visibleLimit = 24; renderShop(); return; }
 });
 $('#pmAdd').onclick = ()=>{ if(!pmProduct || !pmProduct.inStock) return; const s = optionsOf(pmProduct).find(x=>x.id===pmSize);if(!s?.inStock)return;
-  addToCart(pmProduct.name, `${pmProduct.brand} · ${s.label} · demo price`, pmProduct.prices[pmSize], pmProduct.id, pmSize); closeModal(); openCart(); };
+  addToCart(pmProduct.name, `${pmProduct.brand} · ${s.label}${Store.commerce?.salesEnabled?'':' · demo price'}`, pmProduct.prices[pmSize], pmProduct.id, pmSize); closeModal(); openCart(); };
 $('#cartBtn').onclick = ()=>openCart();
 $('#checkoutBtn').onclick = ()=>openCheckout();
 $('#burger').onclick = ()=>{const open = $('#navLinks').classList.toggle('open'); $('#burger').setAttribute('aria-expanded',open);};

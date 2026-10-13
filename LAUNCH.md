@@ -15,4 +15,6 @@ Launch dependencies:
 - Capture delivery addresses only in the real sales flow. Add transactional order emails and fulfillment tracking.
 - Replace representative product artwork with distinct approved images or actual photography. Paid image API use was declined for this release.
 
-Owner confirmed expansion into lifestyle categories, United States market, custom store with CJ API. Country/currency are US/USD for the initial release. Payment provider remains undecided. Owner-only CJ US catalog search and draft preparation are implemented; credentials are pending. See `CJ-SETUP.md`. Stock/cost scheduling, payment-triggered supplier purchases and tracking are still outstanding. No payment credentials were requested in chat or committed.
+Owner confirmed expansion into lifestyle categories, United States market, custom store with CJ API. Country/currency are US/USD for the initial release. The owner has Flutterwave; the production checkout connector uses Flutterwave Standard v3. Owner-only CJ US catalog search and draft preparation are implemented; credentials are pending. See `CJ-SETUP.md`. Stock/cost scheduling is implemented with owner controls and recoverable jobs. Verified-payment order handling, owner-controlled supplier submission/funding and tracking are implemented. Live activation is pending. No payment credentials were requested in chat or committed.
+
+Production integration code and activation instructions: [PRODUCTION-SETUP.md](PRODUCTION-SETUP.md). The build does not provision paid services or connect accounts automatically.

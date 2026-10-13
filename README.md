@@ -2,7 +2,9 @@
 
 Independent fragrance storefront owned by the project author. Work locally with `cd /home/olamihacks/vegarance` and `npm start`.
 
-Current release: VEGArance identity, ink/plum and ivory palette, responsive catalog, saved scent shortlist, product image uploads, authenticated product/order/settings management. Existing catalog prices and artwork remain illustrative; real sales are not enabled. Browser storage is isolated under `vegarance_` keys.
+Production checkout implementation: Flutterwave for the owner’s Nigerian business, CJ freight/owner-controlled fulfillment, Resend order emails, private order-status links, optional TaxJar calculation and a durable Render blueprint. Activation requires approved accounts and private configuration; live integrations have not been tested. See [PRODUCTION-SETUP.md](PRODUCTION-SETUP.md).
+
+Current preview release: VEGArance identity, ink/plum and ivory palette, responsive catalog, saved scent shortlist, product image uploads, authenticated product/order/settings management. Existing catalog prices and artwork remain illustrative; real sales are not enabled. Browser storage is isolated under `vegarance_` keys.
 
 Lifestyle expansion adds Fragrance, Beauty, Fashion, Accessories and Home category browsing, arbitrary size/color options with individual availability and prices, and an owner-only CJ catalog search/draft connector for the United States. See [CJ-SETUP.md](CJ-SETUP.md) to configure `CJ_API_KEY` privately on Render. Supplier orders are not yet automated; preview checkout remains active. New category collections display honest empty states until products are approved.
 
@@ -47,7 +49,17 @@ Full bottles and future candle, soap and body collections need confirmed product
 
 The supplied inventory PDF has conflicting totals (221/26 in the header and approximately 200 at the end), plus brand headings inside product lists. The repository currently contains 215 entries across 23 brand groups; confirm ambiguous entries and final availability with the owner before production.
 
-## Validation
+## Build and validation
+
+The app serves its source assets directly; no bundler or package installation is required. `npm run build` checks every JavaScript file and verifies local HTML/CSS asset references. Render runs this check before starting the service.
+
+```sh
+npm run build
+npm test
+npm run test:browser
+```
+
+The browser suite requires Python Playwright with Chromium installed. Individual checks are also available:
 
 ```sh
 node --check app.js

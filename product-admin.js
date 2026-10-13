@@ -27,10 +27,10 @@ function openEditor(id=null,view=false){
   $('#editorTitle').textContent=view?'Product details':id?'Edit product':'Add a product';
   $('#productFields').disabled=view;$('#productSave').hidden=view;$('#productEditFromView').hidden=!view;
   form.elements.name.value=product?.name||'';form.elements.brand.value=product?.brand||'';form.elements.line.value=product?.line||'';form.elements.blurb.value=product?.blurb||'';form.elements.image.value=product?.image||'';
-  form.elements.category.value=categoryOf(product||{});
+  form.elements.category.value=categoryOf(product||{});form.elements.taxCode.value=product?.taxCode||'';
   editorVariants=(product?.variants||[]).map(v=>({...v,price:effPrice(product,v.id)}));syncEditorType();
   for(const size of ['3ml','5ml','10ml'])form.elements[size].value=product?effPrice(product,size):'';
-  form.elements.inStock.checked=product?inStock(product):true;
+  form.elements.inStock.checked=product?inStock(product):true;form.elements.saleReady.checked=product?.saleReady===true;
   $('#productPreview').src=product?.image||(typeof PRODUCT_IMAGES!=='undefined'&&product&&PRODUCT_IMAGES[product.id])||'images/brand-lattafa.webp';
   $('#productPreview').alt=product?product.name+' demo imagery':'Product image preview';
   editor.showModal();
@@ -46,7 +46,7 @@ form.elements.upload.addEventListener('change',async e=>{
 form.addEventListener('submit',async e=>{
  e.preventDefault();if(!form.reportValidity())return;
  const value={name:form.elements.name.value.trim(),brand:form.elements.brand.value.trim(),line:form.elements.line.value.trim(),blurb:form.elements.blurb.value.trim(),image:form.elements.image.value.trim(),inStock:form.elements.inStock.checked,prices:{}};
- value.category=form.elements.category.value;if(pendingSupplier)value.supplier=pendingSupplier;
+ value.taxCode=form.elements.taxCode.value.trim();value.saleReady=form.elements.saleReady.checked;value.category=form.elements.category.value;if(pendingSupplier)value.supplier=pendingSupplier;
  if(!value.name||!value.brand){$('#productError').textContent='Product name and brand cannot be blank.';return;}
  if(value.image&&!/^(https:\/\/|images\/|\/uploads\/|data:image\/(png|jpeg|webp);base64,)/.test(value.image)){$('#productError').textContent='Use an HTTPS image URL or upload an image.';return;}
  if(!$('#variantEditor').hidden){value.variants=[];for(const v of editorVariants){const price=Number(v.price);if(!v.label.trim()||!Number.isFinite(price)||price<=0||price>10000){$('#productError').textContent='Each option needs a name and a price above zero, up to $10,000.';return;}value.variants.push({id:v.id,label:v.label.trim(),sku:v.sku.trim(),inStock:v.inStock});value.prices[v.id]=Math.round(price*100)/100;}}
@@ -76,7 +76,7 @@ document.addEventListener('submit',async e=>{
 async function ownerSession(){
  if(!Store.server)return;
  $('#resetDemo').hidden=true;$('#logoutOwner').hidden=false;
- document.querySelector('.admin-notice').textContent='Server-backed owner panel. Product changes are stored in the database and shared with storefront visitors. Checkout remains a demonstration; no payments are processed.';
+ document.querySelector('.admin-notice').textContent='Server-backed owner panel. Product changes are stored in the database and shared with storefront visitors. Open Sales & connections for Flutterwave checkout, paid orders and CJ fulfillment.';
  try{const session=await Store.request('/api/session');if(!session.authenticated){$('#ownerLogin').showModal();if(!session.configured)$('#loginError').textContent='The server owner must configure ADMIN_PASSWORD before login.';return;}settings=await Store.request('/api/settings');if(!Object.keys(settings).length)settings=null;renderSettings();const orders=await Store.request('/api/orders');ORDERS.splice(0,ORDERS.length,...orders);renderOrders();}catch(error){toast(error.message);}
 }
 $('#ownerLoginForm').addEventListener('submit',async e=>{e.preventDefault();$('#loginError').textContent='';$('#ownerLoginSubmit').disabled=true;try{await Store.request('/api/login','POST',{password:$('#ownerPassword').value});$('#ownerPassword').value='';$('#ownerLogin').close();await ownerSession();document.dispatchEvent(new Event('owner-authenticated'));}catch(error){$('#loginError').textContent=error.message;}finally{$('#ownerLoginSubmit').disabled=false;}});

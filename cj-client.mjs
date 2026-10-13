@@ -1,4 +1,4 @@
-/* Read-only CJ catalog connector. No supplier purchases or payment methods. */
+/* Server-only CJ catalog, shipping, and owner-controlled fulfillment connector. */
 const API='https://developers.cjdropshipping.com/api2.0/v1/';
 export function createCJ({apiKey=process.env.CJ_API_KEY||'',fetcher=fetch}={}){
  let token='',expires=0,queue=Promise.resolve(),last=0,authPending;
@@ -10,6 +10,20 @@ export function createCJ({apiKey=process.env.CJ_API_KEY||'',fetcher=fetch}={}){
  }
  return {
   configured:!!apiKey,
+  async freight(products,zip){
+   const result=await call('logistic/freightCalculate',{startCountryCode:'US',endCountryCode:'US',zip,products});
+   if(!Array.isArray(result))throw failure(502,'Supplier shipping quote is unavailable.');
+   return result.filter(r=>typeof r.logisticName==='string'&&r.logisticName.length<=100).flatMap(r=>{
+    const amount=r.totalPostageFee??r.logisticPrice;
+    if(amount===null||amount===undefined||!Number.isFinite(Number(amount))||Number(amount)<0||Number(amount)>1000)return [];
+    const extra=r.totalPostageFee==null?Number(r.taxesFee||0)+Number(r.clearanceOperationFee||0):0;
+    if(!Number.isFinite(extra)||extra<0)return [];
+    return [{name:r.logisticName,cents:Math.ceil((Number(amount)+extra)*100),transit:String(r.logisticAging||'')}];
+   }).sort((a,b)=>a.cents-b.cents);
+  },
+  createOrder:payload=>call('shopping/order/createOrderV2',{...payload,payType:3,fromCountryCode:'US',shippingCountryCode:'US',shippingCountry:'United States',platform:'Api',orderFlow:1,shopLogisticsType:2}),
+  payOrder:shipmentOrderId=>call('shopping/pay/payBalanceV2',{shipmentOrderId}),
+  order:id=>call('shopping/order/getOrderDetail?'+new URLSearchParams({orderId:id})),
   async variant(id){const v=await call('product/variant/queryByVid?'+new URLSearchParams({vid:id,features:'enable_inventory'}));const cost=Number(v?.variantSellPrice);if(v?.vid!==id||!Number.isFinite(cost)||cost<=0||!Array.isArray(v.inventories))throw failure(502,'CJ option data is incomplete.');const warehouses=v.inventories.filter(w=>w.countryCode==='US'&&String(w.verifiedWarehouse)==='1');if(warehouses.some(w=>w.totalInventory===null||!/^\d+$/.test(String(w.totalInventory))||!Number.isSafeInteger(Number(w.totalInventory))))throw failure(502,'CJ inventory data is incomplete.');return {cost,quantity:warehouses.reduce((n,w)=>n+Number(w.totalInventory),0)};},
   async search(query,page=1){const params=new URLSearchParams({keyWord:query,page:String(page),size:'12',countryCode:'US'});const data=await call('product/listV2?'+params);return {page,total:data?.totalRecords||0,products:(data?.content||[]).flatMap(group=>group.productList||[]).map(p=>({id:p.id,name:p.nameEn,image:/^https:\/\//.test(p.bigImage||'')?p.bigImage:'',cost:p.sellPrice,stock:p.warehouseInventoryNum,category:p.oneCategoryName}))};},
   async draft(id,category,markup){const p=await call('product/query?'+new URLSearchParams({pid:id}));if(!Array.isArray(p?.variants)||!p.variants.length||p.variants.length>100)throw failure(422,'This supplier product needs manual variant review.');const prices={},variants=p.variants.map(v=>{const cost=Number(v.variantSellPrice);if(!Number.isFinite(cost)||cost<=0)throw failure(422,'Supplier option price requires manual review.');prices[v.vid]=Math.round(cost*(1+markup/100)*100)/100;return {id:v.vid,label:String(v.variantKey||v.variantNameEn||v.variantSku).slice(0,160),sku:String(v.variantSku||'').slice(0,100),inStock:false};});return {name:String(p.productNameEn||'').slice(0,160),brand:'VEGArance',category,line:'',blurb:'',image:/^https:\/\//.test(p.bigImage||'')?p.bigImage:'',inStock:false,variants,prices,supplier:{provider:'cj',productId:id}};}

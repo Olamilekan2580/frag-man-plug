@@ -1,0 +1,52 @@
+/* Production connections and paid orders are separate from preview records. */
+const salesTab=document.createElement('button');salesTab.className='admin-tab';salesTab.dataset.tab='sales';salesTab.setAttribute('role','tab');salesTab.textContent='Sales & connections';
+salesTab.onclick=()=>{showTab('sales');history.replaceState(null,'','?tab=sales');refreshSales();};document.querySelector('.admin-tabs').append(salesTab);
+const salesPane=document.createElement('section');salesPane.className='admin-pane';salesPane.id='pane-sales';
+salesPane.innerHTML=`<p class="eyebrow">Production store</p><h2>Sales & connections</h2><p class="integration-note">Flutterwave for your Nigerian business · CJ fulfillment · US delivery · USD pricing. Configure private keys in Render. Keys are never entered or displayed here.</p><p id="salesStatus" role="status"></p><div class="connection-list" id="salesConnections"></div><div class="sales-summary" id="salesStats"></div><form class="sales-form" id="salesSettings"><label>Business name<input name="businessName" maxlength="100" required></label><label>Customer support email<input name="supportEmail" type="email" maxlength="100" required></label><label>Maximum processing time (days, before carrier transit)<input name="processingDays" type="number" min="0" max="30" step="1" required></label><label>Shipping policy<textarea name="shippingPolicy" maxlength="12000" required placeholder="Your actual delivery regions, processing times, shipping estimates and delayed-order handling."></textarea></label><label>Return & refund policy<textarea name="returnPolicy" maxlength="12000" required placeholder="Your approved return window, eligibility, return address, costs and refund process."></textarea></label><label>Privacy policy<textarea name="privacyPolicy" maxlength="12000" required placeholder="How your business handles customer data, payment and fulfillment providers, retention and customer requests."></textarea></label><label>Terms of sale<textarea name="terms" maxlength="12000" required placeholder="Your approved terms, business identity, customer contact and order conditions."></textarea></label><label>State tax rates (%) — JSON<input name="taxRates" placeholder='{"CA":7.25}' value="{}"></label><p class="integration-note">When TAXJAR_API_TOKEN and the shipping origin are configured, address-based TaxJar calculation replaces these state rates. State-only rates do not calculate city/county taxes or product-specific exemptions. Have your tax adviser confirm whether this setup fits your obligations. If destination-specific calculation is required, keep sales closed until that service is integrated.</p><label class="sales-check"><input name="taxReviewed" type="checkbox">I have reviewed the US tax treatment and configured the applicable rates.</label><label class="sales-check"><input name="enabled" type="checkbox">Open checkout when all connection checks pass</label><p class="form-error" id="salesSettingsError" role="alert"></p><button class="btn btn-gold" type="submit">Save sales settings</button></form><div class="commerce-box"><h2>Paid orders & fulfillment</h2><p class="integration-note">Submit to CJ after verifying payment. Funding deducts from your CJ balance. Supplier timeouts require review in CJ before another action. Test payments create test orders only.</p><button class="btn btn-ghost btn-sm" type="button" id="refreshSales">Refresh orders</button><div id="liveOrders"></div></div><div class="commerce-box"><h2>Order email delivery</h2><div id="emailHistory" class="email-history"></div></div>`;
+document.querySelector('.admin-main').append(salesPane);
+let salesLoaded=false;
+const salesDollars=c=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(c/100);
+async function refreshSales(){
+  if(!Store.server){$('#salesStatus').textContent='Run the Node service to configure production sales.';$('#salesSettings').hidden=true;return;}
+  try{
+    const data=await Store.request('/api/sales');
+    $('#salesStatus').textContent=`${data.enabled&&data.ready?'Checkout open':'Checkout closed'} · Flutterwave ${data.paymentMode} mode`;
+    $('#salesConnections').innerHTML=data.checks.map(c=>`<div class="connection"><strong>${esc(c.name)}</strong><small>${c.ready?'✓ Configured':'Setup required'}</small></div>`).join('');
+    $('#salesStats').innerHTML=`<div><strong>${salesDollars(data.stats.revenueCents)}</strong><span>Paid order value${data.paymentMode==='test'?' (test)':''}</span></div><div><strong>${data.stats.orders}</strong><span>Paid orders</span></div><div><strong>${data.stats.needAttention}</strong><span>Need attention</span></div><div><strong>${data.stats.refunds}</strong><span>Refunded orders</span></div>`;
+    if(!salesLoaded){const form=$('#salesSettings');for(const key of ['businessName','supportEmail','processingDays','shippingPolicy','returnPolicy','privacyPolicy','terms'])form.elements[key].value=data.config[key];form.elements.taxRates.value=JSON.stringify(data.config.taxRates);form.elements.taxReviewed.checked=data.config.taxReviewed;form.elements.enabled.checked=data.config.enabled;salesLoaded=true;}
+    const orders=await Store.request('/api/sales/orders');
+    $('#liveOrders').innerHTML=orders.length?orders.map(o=>{
+      const a=o.address,paid=o.paymentStatus==='paid',live=o.paymentMode==='live';
+      const buttons=[];
+      if(paid&&live&&o.fulfillment.state==='not_started'&&!o.refund)buttons.push(`<button class="btn btn-gold" data-sales-action="dispatch" data-order-id="${esc(o.id)}">Submit paid order to CJ</button>`);
+      if(paid&&live&&o.fulfillment.state==='awaiting_supplier_payment'&&o.fulfillment.shipmentOrderId)buttons.push(`<button class="btn btn-gold" data-sales-action="fund" data-order-id="${esc(o.id)}" data-amount="${esc(o.fulfillment.amount??'Check CJ')}">Pay CJ supplier order</button>`);
+      if(paid&&o.fulfillment.state==='not_started'&&!o.refund)buttons.push(`<button class="btn btn-ghost" data-sales-action="refund" data-order-id="${esc(o.id)}" data-amount="${esc(salesDollars(o.totalCents))}">Issue full refund</button>`);
+      if(paid&&live&&['needs_review','funding_needs_review'].includes(o.fulfillment.state))buttons.push(`<button class="btn btn-ghost" data-sales-action="reconcile" data-order-id="${esc(o.id)}">Link verified existing CJ order</button>`);
+      if(o.fulfillment.orderId)buttons.push(`<button class="btn btn-ghost" data-sales-action="tracking" data-order-id="${esc(o.id)}">Sync tracking</button>`);
+      return `<article class="live-order"><div class="live-order-heading"><h3>${esc(o.id)}</h3><strong>${salesDollars(o.totalCents)}</strong></div><p>${esc(o.status)} · ${esc(o.paymentMode)} payment · ${esc(new Date(o.createdAt).toLocaleString())}</p><p>${o.lines.map(l=>`${esc(l.name)} (${esc(l.option)}) ×${l.qty}`).join('<br>')}</p><p>${esc(a.name)} · ${esc(a.email)} · ${esc(a.phone)}<br>${esc(a.line1)} ${esc(a.line2)}<br>${esc(a.city)}, ${esc(a.state)} ${esc(a.zip)} · US</p><p>Shipping: ${esc(o.shippingMethod)} · ${salesDollars(o.shippingCents)}${o.fulfillment.orderId?`<br>CJ order: ${esc(o.fulfillment.orderId)} · ${esc(o.fulfillment.state)}`:''}${o.tracking?`<br>Tracking: ${esc(o.tracking.number)} · ${esc(o.tracking.carrier)}`:''}</p><div class="live-order-actions">${buttons.join('')}</div></article>`;
+    }).join(''):'<p class="integration-note">No customer orders yet.</p>';
+    $('#emailHistory').innerHTML=data.emailJobs.length?data.emailJobs.map(j=>`<p>${esc(j.orderId)} · ${esc(j.kind)} · ${esc(j.state)} · attempts ${j.attempts}${j.state==='needs_review'?` <button type="button" class="text-button" data-email-retry="${esc(j.id)}">Retry delivery</button>`:''}</p>`).join(''):'<p>No order emails queued.</p>';
+  }catch(error){$('#salesStatus').textContent=error.message;}
+}
+$('#salesSettings').onsubmit=async event=>{
+  event.preventDefault();const form=event.target,button=form.querySelector('[type=submit]');button.disabled=true;$('#salesSettingsError').textContent='';
+  try{
+    const cfg=Object.fromEntries(['businessName','supportEmail','shippingPolicy','returnPolicy','privacyPolicy','terms'].map(k=>[k,form.elements[k].value.trim()]));
+    cfg.processingDays=Number(form.elements.processingDays.value);cfg.taxRates=JSON.parse(form.elements.taxRates.value);cfg.taxReviewed=form.elements.taxReviewed.checked;cfg.enabled=form.elements.enabled.checked;
+    await Store.request('/api/sales','PUT',cfg);toast('Sales settings saved.');await refreshSales();
+  }catch(error){$('#salesSettingsError').textContent=error instanceof SyntaxError?'Enter valid JSON for state tax rates.':error.message;}finally{button.disabled=false;}
+};
+$('#refreshSales').onclick=refreshSales;
+$('#emailHistory').onclick=async event=>{const button=event.target.closest('[data-email-retry]');if(!button)return;button.disabled=true;try{await Store.request('/api/sales/emails/'+encodeURIComponent(button.dataset.emailRetry)+'/retry','POST',{});await refreshSales();}catch(error){toast(error.message);}finally{button.disabled=false;}};
+$('#liveOrders').onclick=async event=>{
+  const button=event.target.closest('[data-sales-action]');if(!button)return;
+  const action=button.dataset.salesAction,id=button.dataset.orderId;
+  const prompt=action==='fund'?`Pay the CJ supplier order for ${id}? CJ reports ${button.dataset.amount} USD. This deducts from your CJ balance. Check the final amount in CJ before confirming.`:action==='refund'?`Issue a full refund of ${button.dataset.amount} for ${id}?`:action==='dispatch'?`Submit ${id} to CJ using the saved customer address and shipping service? Supplier funding is a separate step.`:null;
+  if(prompt&&!confirm(prompt))return;
+  const payload={};if(action==='reconcile'){const entered=window.prompt('Enter the existing CJ order ID after locating this VEGArance reference in CJ. Products and store reference will be verified.');if(!entered)return;payload.orderId=entered.trim();}
+  button.disabled=true;
+  try{await Store.request('/api/sales/orders/'+encodeURIComponent(id)+'/'+action,'POST',payload);toast('Order updated.');await refreshSales();}catch(error){toast(error.message);await refreshSales();}finally{if(button.isConnected)button.disabled=false;}
+};
+document.addEventListener('owner-authenticated',()=>{salesLoaded=false;refreshSales();});
+if(new URLSearchParams(location.search).get('tab')==='sales'){showTab('sales');refreshSales();}
+setInterval(()=>{if(Store.server&&!$('#ownerLogin').open&&salesPane.classList.contains('active'))refreshSales();},30000);

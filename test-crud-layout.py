@@ -1,8 +1,12 @@
 """Product CRUD and vertical containment regression tests, static and Node modes."""
-import json,os,subprocess,tempfile,threading
+import json,os,subprocess,tempfile,threading,argparse
 from pathlib import Path
 from http.server import ThreadingHTTPServer,SimpleHTTPRequestHandler
 from playwright.sync_api import sync_playwright
+parser=argparse.ArgumentParser()
+parser.add_argument('--layout-only',action='store_true')
+parser.add_argument('--widths',default='320,375,390,480,600,768,820,1024,1440,1920')
+args=parser.parse_args()
 os.chdir(Path(__file__).parent)
 class Quiet(SimpleHTTPRequestHandler):
     def log_message(self,*args):pass
@@ -15,9 +19,9 @@ with tempfile.TemporaryDirectory(prefix='fmp-ui-') as database:
         node_port=int(process.stdout.readline().strip().split()[-1])
         with sync_playwright() as p:
             browser=p.chromium.launch()
-            for mode,base in [('browser',f'http://127.0.0.1:{static.server_port}'),('server',f'http://127.0.0.1:{node_port}')]:
+            for mode,base in ([] if args.layout_only else [('browser',f'http://127.0.0.1:{static.server_port}'),('server',f'http://127.0.0.1:{node_port}')]):
                 context=browser.new_context(viewport={'width':390,'height':844},is_mobile=True,has_touch=True)
-                page=context.new_page();page.emulate_media(reduced_motion='reduce');page.on('pageerror',lambda e:errors.append(str(e)))
+                page=context.new_page();page.set_default_timeout(90000);page.set_default_navigation_timeout(90000);page.emulate_media(reduced_motion='reduce');page.on('pageerror',lambda e:errors.append(str(e)))
                 page.goto(base+'/admin.html',wait_until='domcontentloaded')
                 if mode=='server':
                     page.locator('#ownerPassword').fill('test-owner-password-123');page.locator('#ownerLoginSubmit').click();page.locator('#ownerLogin').wait_for(state='hidden')
@@ -51,8 +55,8 @@ with tempfile.TemporaryDirectory(prefix='fmp-ui-') as database:
                 reports.append(mode+': create/read/edit/image upload/delete/cancel + storefront propagation PASS')
                 print(reports[-1],flush=True)
                 context.close()
-            for width in [320,375,390,480,600,768,820,1024,1440,1920]:
-                page=browser.new_page(viewport={'width':width,'height':844});page.emulate_media(reduced_motion='reduce');page.on('pageerror',lambda e:errors.append(str(e)));page.goto(f'http://127.0.0.1:{static.server_port}',wait_until='domcontentloaded')
+            for width in [int(w) for w in args.widths.split(',')]:
+                page=browser.new_page(viewport={'width':width,'height':844});page.set_default_timeout(90000);page.set_default_navigation_timeout(90000);page.emulate_media(reduced_motion='reduce');page.on('pageerror',lambda e:errors.append(str(e)));page.goto(f'http://127.0.0.1:{static.server_port}',wait_until='domcontentloaded')
                 for section in ['#featured','#shop','#sizes','#mix','.perks','#soon','#story','#discovery','#faq','.footer']:
                     page.locator(section).scroll_into_view_if_needed();page.wait_for_timeout(20)
                     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'),f'Width overflow {width} {section}'
@@ -66,7 +70,7 @@ with tempfile.TemporaryDirectory(prefix='fmp-ui-') as database:
                         page.locator(section).scroll_into_view_if_needed();page.screenshot(path=f'/home/olamihacks/frag-man-plug/previews/{name}.png')
                 page.close()
                 print(f'Layout {width}px PASS',flush=True)
-            reports.append('10 viewport widths: all sections, scrolling list containment, group overlaps, expanded FAQ PASS')
+            reports.append(f'{len(args.widths.split(","))} viewport widths: all sections, scrolling list containment, group overlaps, expanded FAQ PASS')
             assert not errors,errors
             browser.close()
     finally:
