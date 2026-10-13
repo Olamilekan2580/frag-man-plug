@@ -75,3 +75,11 @@ The browser checks require Python Playwright and Chromium and start their own lo
 ## Hosting
 
 The current static Render service publishes the repository root. The separate Node service uses `npm start` and the free settings in `render.yaml`; follow [RENDER-SETUP.md](RENDER-SETUP.md). Client GitHub ownership transfer, real pricing, logo, payment provider, durable production storage and final policies remain to be finalized.
+
+## Merchant platform foundation
+
+Open `/platform.html` on the Node service to sign up, create up to five stores, manage branding and products, and publish catalog storefronts at `/shops/{slug}`. Each merchant owns separate store/product records. The existing single-store owner dashboard and payment accounts are separate; merchant accounts cannot access them. Passwords use salted scrypt hashes; only hashed session tokens are stored. Sessions expire after seven days and survive server restarts.
+
+Merchant storefronts are catalogs with checkout disabled. Per-merchant encrypted provider credentials, CJ imports, order/checkout routing, subscription billing, custom domains, email verification and password recovery are outstanding platform work. Do not invite paying merchants yet. Account and store persistence requires durable storage on Render. No credentials or live orders are copied from the original store to merchants.
+
+Run `npm run test:platform` for merchant authentication, tenant isolation, visibility, restart persistence and validation checks.

@@ -1,3 +1,4 @@
+import {createPlatform} from './platform.mjs';
 import http from 'node:http';
 import {createCommerce} from './commerce.mjs';
 import {createCJ} from './cj-client.mjs';
@@ -48,11 +49,13 @@ function publicLimit(req){
  if(publicRates.size>10000)for(const [key,value] of publicRates)if(value.until<Date.now())publicRates.delete(key);
  if(entry.count>30)throw fail(429,'Too many requests. Please try again in a minute.');
 }
+const platform=createPlatform({db,body,send,sameOrigin});
 const mime={'.html':'text/html; charset=utf-8','.css':'text/css','.js':'text/javascript','.svg':'image/svg+xml','.webp':'image/webp','.png':'image/png','.jpg':'image/jpeg','.ttf':'font/ttf'};
 const server=http.createServer(async(req,res)=>{
  res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','same-origin');res.setHeader('X-Frame-Options','DENY');
  try{
   const url=new URL(req.url,'http://'+req.headers.host),path=decodeURIComponent(url.pathname),method=req.method;
+  if(await platform.route(req,res,url))return;
   if(path==='/api/store-config'&&method==='GET')return send(res,200,commerce.publicConfig());
   if(path==='/api/webhooks/flutterwave'&&method==='POST'){
    let size=0,parts=[];for await(const chunk of req){size+=chunk.length;if(size>1000000)throw fail(413,'Webhook too large');parts.push(chunk);}
@@ -102,7 +105,7 @@ const server=http.createServer(async(req,res)=>{
   }
   if(path==='/products.js'){const publicProducts=catalog();if(!new URL(req.url,'http://'+req.headers.host).searchParams.has('owner')&&commerce.publicConfig().salesEnabled)publicProducts.splice(0,publicProducts.length,...publicProducts.filter(p=>p.saleReady));res.writeHead(200,{'Content-Type':'text/javascript','Cache-Control':'no-store'});return res.end('const PRODUCTS = '+JSON.stringify(publicProducts).replace(/</g,'\\u003c')+'; const SERVER_SETTINGS = '+JSON.stringify(setting()).replace(/</g,'\\u003c')+'; const SERVER_COMMERCE = '+JSON.stringify(commerce.publicConfig()).replace(/</g,'\\u003c')+';');}
   if(method!=='GET'&&method!=='HEAD')throw fail(405,'Method not allowed');
-  const file=path.startsWith('/uploads/')?resolve(data,'uploads',basename(path)):resolve(root,path==='/'?'index.html':path.slice(1));
+  const file=path.startsWith('/uploads/')?resolve(data,'uploads',basename(path)):resolve(root,path==='/'?'index.html':/^\/shops\/[a-z0-9-]+$/.test(path)?'merchant-shop.html':path.slice(1));
   if(!file.startsWith(root)&&!file.startsWith(resolve(data,'uploads')+'/'))throw fail(403,'Forbidden');
   if(path.startsWith('/data')||path.startsWith('/.')||['.mjs','.py','.json','.md'].includes(extname(file))||!mime[extname(file)]||!existsSync(file)||!statSync(file).isFile())throw fail(404,'Not found');
   let content=readFileSync(file);if(extname(file)==='.html')content=content.toString().replace('</head>','<meta name="store-mode" content="server"></head>');
