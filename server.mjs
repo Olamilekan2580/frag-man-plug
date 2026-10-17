@@ -3,16 +3,20 @@ import http from 'node:http';
 import {createCommerce} from './commerce.mjs';
 import {createCJ} from './cj-client.mjs';
 import {createPrintful} from './printful-client.mjs';
+import {createPrintify} from './printify-client.mjs';
 import {createAliExpress} from './aliexpress-client.mjs';
 import {createPublicApi} from './public-api.mjs';
 import {createAI} from './ai-client.mjs';
+import {createSupport} from './ai-support.mjs';
 import {parseCSV} from './csv-import.mjs';
 import {applyRules,validateRules} from './pricing.mjs';
 import {createSupplierSync} from './supplier-sync.mjs';
 const cj=createCJ();
 const printful=createPrintful();
+const printify=createPrintify();
 const aliexpress=createAliExpress();
 const ai=createAI();
+const support=createSupport({ai,lookupOrder:(token)=>commerce.lookup(token),getCatalog:async()=>catalog().filter(p=>p.saleReady),policies:()=>{const cfg=commerce.publicConfig();return {shippingPolicy:cfg.shippingPolicy,returnPolicy:cfg.returnPolicy,privacyPolicy:cfg.privacyPolicy,terms:cfg.terms,supportEmail:cfg.supportEmail,processingDays:cfg.processingDays};}});
 import {readFileSync,existsSync,mkdirSync,writeFileSync,statSync} from 'node:fs';
 import {resolve,extname,basename} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -50,7 +54,7 @@ function product(input,existing=null){
  if(p.variants!==undefined){if(!Array.isArray(p.variants)||!p.variants.length||p.variants.length>100)throw fail(422,'Provide 1–100 product options');const ids=new Set();variants=p.variants.map(v=>{if(!v||typeof v.id!=='string'||!/^[-a-zA-Z0-9_]{1,100}$/.test(v.id)||ids.has(v.id)||typeof v.label!=='string'||!v.label.trim()||v.label.length>160||typeof v.inStock!=='boolean'||(v.sku!==undefined&&(typeof v.sku!=='string'||v.sku.length>100)))throw fail(422,'Invalid or duplicate product option');ids.add(v.id);return {id:v.id,label:v.label.trim(),sku:v.sku||'',inStock:v.inStock};});}
  if(p.category!=='Fragrance'&&!variants)throw fail(422,'Lifestyle products require product options');
  if(!p.prices||typeof p.prices!=='object')throw fail(422,'Prices required');const prices={};for(const size of variants?variants.map(v=>v.id):['3ml','5ml','10ml']){const n=p.prices[size];if(typeof n!=='number'||!Number.isFinite(n)||n<=0||n>10000)throw fail(422,`Invalid ${size} price`);prices[size]=Math.round(n*100)/100;}
- let supplier;if(p.supplier!==undefined){if(!p.supplier||!['cj','printful','csv'].includes(p.supplier.provider)||typeof p.supplier.productId!=='string'||!/^[-a-zA-Z0-9:]{1,100}$/.test(p.supplier.productId))throw fail(422,'Invalid supplier reference');supplier={provider:p.supplier.provider,productId:p.supplier.productId};}
+ let supplier;if(p.supplier!==undefined){if(!p.supplier||!['cj','printful','printify','csv'].includes(p.supplier.provider)||typeof p.supplier.productId!=='string'||!/^[-a-zA-Z0-9:]{1,100}$/.test(p.supplier.productId))throw fail(422,'Invalid supplier reference');supplier={provider:p.supplier.provider,productId:p.supplier.productId};}
  return {taxCode:p.taxCode,saleReady:p.saleReady===true,...(supplier?{supplier}:{}),...(existing?.supplierSync&&supplier?.productId===existing.supplier?.productId?{supplierSync:existing.supplierSync}:{}),id:existing?.id||'p-'+randomBytes(8).toString('hex'),name:p.name,brand:p.brand,category:p.category,line:p.line,blurb:p.blurb,mono:p.brand.slice(0,3).toUpperCase(),prices,inStock:p.inStock,image:p.image,...(variants?{variants}:{}),badges:[],updatedAt:new Date().toISOString()};
 }
 const publicRates=new Map();
@@ -75,8 +79,9 @@ const server=http.createServer(async(req,res)=>{
   if(path==='/api/checkout'&&method==='POST'){sameOrigin(req);publicLimit(req);return send(res,201,await commerce.checkout(await body(req)));}
   if(path==='/api/order-status'&&method==='GET')return send(res,200,await commerce.lookup(url.searchParams.get('token')));
   if(path==='/api/order-status/verify'&&method==='POST'){sameOrigin(req);publicLimit(req);return send(res,200,await commerce.lookup((await body(req)).token,true));}
+  if(path==='/api/ai/support'&&method==='POST'){sameOrigin(req);publicLimit(req);const b=await body(req);return send(res,200,await support.answer({question:b.question,orderToken:b.orderToken}));}
   if(path==='/api/health')return send(res,200,{ok:true,storage:'sqlite',time:new Date().toISOString(),
-   suppliers:{cj:{configured:cj.configured},printful:{configured:printful.configured},aliexpress:{configured:aliexpress.configured},csv:{configured:true},ai:{configured:ai.configured}},
+   suppliers:{cj:{configured:cj.configured},printful:{configured:printful.configured},printify:{configured:printify.configured},aliexpress:{configured:aliexpress.configured},csv:{configured:true},ai:{configured:ai.configured}},
    sales:{enabled:commerce.publicConfig().salesEnabled,ready:commerce.readiness().ready},
    webhooks:publicApi.stats()});
   // Public API v1 (API-key auth, never the owner cookie). Keys are scoped;
@@ -138,10 +143,14 @@ const server=http.createServer(async(req,res)=>{
    if(path==='/api/suppliers/printful/status'&&method==='GET')return send(res,200,{configured:printful.configured,market:'POD',orderAutomation:false});
    if(path==='/api/suppliers/printful/search'&&method==='GET'){const q=(url.searchParams.get('q')||'').trim();if(!q||q.length>120)throw fail(422,'Enter a search up to 120 characters');return send(res,200,await printful.search(q));}
    if(path==='/api/suppliers/printful/draft'&&method==='POST'){const b=await body(req);if(typeof b.id!=='string'||!/^[-a-zA-Z0-9]{1,100}$/.test(b.id)||!['Fragrance','Beauty','Fashion','Accessories','Home'].includes(b.category)||typeof b.markup!=='number'||!Number.isFinite(b.markup)||b.markup<0||b.markup>1000)throw fail(422,'Invalid draft request');return send(res,200,await printful.draft(b.id,b.category,b.markup));}
+   if(path==='/api/suppliers/printify/status'&&method==='GET')return send(res,200,{configured:printify.configured,market:'POD',orderAutomation:false});
+   if(path==='/api/suppliers/printify/search'&&method==='GET'){const q=(url.searchParams.get('q')||'').trim();if(!q||q.length>120)throw fail(422,'Enter a search up to 120 characters');return send(res,200,await printify.search(q));}
+   if(path==='/api/suppliers/printify/draft'&&method==='POST'){const b=await body(req);if(typeof b.id!=='string'||!/^[-a-zA-Z0-9:]{1,100}$/.test(b.id)||!['Fragrance','Beauty','Fashion','Accessories','Home'].includes(b.category)||typeof b.markup!=='number'||!Number.isFinite(b.markup)||b.markup<0||b.markup>1000)throw fail(422,'Invalid draft request');return send(res,200,await printify.draft(b.id,b.category,b.markup));}
    if(path==='/api/suppliers/csv/draft'&&method==='POST'){const b=await body(req);if(typeof b.csv!=='string')throw fail(422,'Provide CSV text');return send(res,200,parseCSV(b.csv));}
    const supplierStatus=()=>({suppliers:[
     {provider:'cj',configured:cj.configured,state:cj.configured?'connected':'not_configured',nextStep:cj.configured?'CJ is ready. Search the catalogue below to prepare drafts.':'Set CJ_API_KEY privately in Render Environment, then redeploy.'},
     {provider:'printful',configured:printful.configured,state:printful.configured?'connected':'not_configured',nextStep:printful.configured?'Printful is ready. Search your Printful store products below. Orders stay drafts until you confirm them in Printful.':'Set PRINTFUL_API_TOKEN privately in Render Environment, then redeploy.'},
+    {provider:'printify',configured:printify.configured,state:printify.configured?'connected':'not_configured',nextStep:printify.configured?'Printify is ready. Search your Printify shop products below. Orders stay drafts until you send them to production in Printify.':'Set PRINTIFY_API_TOKEN and PRINTIFY_SHOP_ID privately in Render Environment, then redeploy. The token lasts 1 year — calendar a rotation reminder.'},
     {provider:'aliexpress',configured:aliexpress.configured,state:aliexpress.configured?'connected':'not_configured',nextStep:aliexpress.configured?'AliExpress is ready. Search the affiliate catalogue below. Stock is not reported live — verify each listing before approving it, and fulfil orders manually in AliExpress.':'Apply in AliExpress Portals (Tools → API), then set ALIEXPRESS_APP_KEY, ALIEXPRESS_APP_SECRET and ALIEXPRESS_TRACKING_ID privately in Render Environment. Approval takes a few days.'},
     {provider:'csv',configured:true,state:'connected',nextStep:'Paste any supplier CSV below to build drafts. No key needed; nothing is purchased.'}]});
    if(path==='/api/suppliers/status'&&method==='GET')return send(res,200,supplierStatus());
