@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<title>Search — VEGArance</title>
+<meta name="description" content="Search the VEGArance collection by product, brand, or category.">
+<link rel="stylesheet" href="fonts.css">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="refinement.css">
+<link rel="stylesheet" href="luxury.css">
+<link rel="stylesheet" href="layout-fixes.css">
+<link rel="stylesheet" href="vegarance.css">
+<link rel="stylesheet" href="commerce.css">
+<link rel="stylesheet" href="vegarance-pages.css">
+<link rel="stylesheet" href="support-widget.css">
+</head>
+<body data-page="search">
+<a class="skip-link" href="#vegaMain">Skip to content</a>
+<div class="announce" id="vegaAnnounce">VEGARANCE <span> / </span> THE ART OF LIVING <span> / </span> COLLECTION PREVIEW</div>
+<header id="vegaHeader"></header>
+<main class="vega-page" id="vegaMain">
+<nav class="vega-crumb" aria-label="Breadcrumb"><a href="index.html">Home</a> / <span>Search</span></nav>
+<h1>Search the collection.</h1>
+<form class="vega-search-row" id="searchForm" role="search"><label for="searchInput" style="position:absolute;left:-9999px">Search products</label><input type="search" id="searchInput" placeholder="Search a product or brand…" aria-label="Search products"><button class="btn btn-gold" type="submit">Search</button></form>
+<p id="searchCount" aria-live="polite"></p><div id="searchSuggestions"></div><div id="searchGrid"></div>
+</main>
+<footer id="vegaFooter"></footer>
+<nav id="vegaMobileNav" aria-label="Mobile navigation"></nav>
+<div id="vegaExtras"></div>
+<script src="products.js"></script>
+<script src="catalog-model.js"></script>
+<script src="product-images.js"></script>
+<script src="support-widget.js"></script>
+<script src="vegarance-pages.js"></script>
+</body>
+</html>
