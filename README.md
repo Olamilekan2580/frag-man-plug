@@ -10,6 +10,8 @@ Lifestyle expansion adds Fragrance, Beauty, Fashion, Accessories and Home catego
 
 CJ stock/cost sync now supports owner-controlled scheduling, opt-in price updates, manual runs, persisted job history, retries and interrupted-job recovery. Missing or stale supplier checks block checkout. Automation defaults off and does not purchase supplier orders. Free Render sleeping/reset behavior prevents reliable continuous operation until durable hosting is configured. Run `node test-sync.mjs` and `node test-cj.mjs` for mocked worker/provider checks, plus `npm run test:api` and `python3 test-crud-layout.py` for API/browser validation.
 
+Vegarance v2 (branch `vegarance-v2`) adds, without changing the checkout engine: an AI product-description endpoint (`POST /api/ai/describe`, Groq default / OpenAI-compatible, key-gated, banned-claim validation — see [AI-SETUP.md](AI-SETUP.md)); a deterministic pricing/margin engine (`POST /api/pricing/preview`, USD/NGN charm rounding, margin-floor guard — the engine sets prices, the LLM only suggests); a second distributor adapter, Printful print-on-demand (`/api/suppliers/printful/*`, draft-only orders, never auto-confirms — see [PRINTFUL-SETUP.md](PRINTFUL-SETUP.md)); and a no-key CSV/feed import adapter (`POST /api/suppliers/csv/draft`). Printful orders are made to order (no stock counts). CJ Dropshipping and CJ Affiliate (docs.cj.com) are different companies — never mix their credentials.
+
 Before taking real orders: confirm sellable inventory and prices, country/currency and fulfillment policies; connect a payment account and verified webhook; use durable database/upload storage; add transactional email and real shipping/tax rules. The existing free Render filesystem may reset.
 
 ## Technical reference
