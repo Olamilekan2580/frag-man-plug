@@ -52,6 +52,16 @@ try {
   assert.equal(withStore.data.steps.find(s => s.id === 'publish').status, 'locked');
 
   assert.equal((await req(api + 'onboarding?storeId=' + '0'.repeat(32), 'GET', undefined, signup.cookie)).status, 404);
+  // Phase B billing: Free allows 1 store, so a second store needs the trial (or a paid plan).
+  const billingBefore = await req(api + 'billing', 'GET', undefined, signup.cookie);
+  assert.equal(billingBefore.data.billing.effectivePlan, 'free');
+  assert.equal(billingBefore.data.billing.billingEnabled, false);
+  assert.equal((await req(api + 'stores', 'POST', {name: 'Second', slug: 'second-store'}, signup.cookie)).status, 402);
+  const trial = await req(api + 'billing/trial', 'POST', {}, signup.cookie);
+  assert.equal(trial.status, 200);
+  assert.equal(trial.data.billing.effectivePlan, 'starter');
+  assert.equal(trial.data.billing.status, 'trialing');
+  assert.equal((await req(api + 'billing/trial', 'POST', {}, signup.cookie)).status, 409, 'trial is once ever');
   const second = await req(api + 'stores', 'POST', {name: 'Second', slug: 'second-store'}, signup.cookie);
   assert.equal(second.status, 201);
   const picked = await req(api + 'onboarding?storeId=' + second.data.id, 'GET', undefined, signup.cookie);

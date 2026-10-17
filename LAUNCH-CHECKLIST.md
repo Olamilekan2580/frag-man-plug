@@ -20,6 +20,11 @@ end-to-end order.
       real keys in the repo.
 
 ## 2. Hosting & storage — USER ACTION / DECISION
+- [x] DONE (Phase B, branch `vegarance-v3`) — Storage truthfulness built:
+      `storage.mjs` reports durable/ephemeral + `DATABASE_URL`
+      recognised-but-not-wired; backup verification (`npm run backup:verify`)
+      checks integrity + required tables; health endpoint exposes storage
+      detail. Full options + migration path documented in `STORAGE.md`.
 - [ ] DECISION — Durable storage. The free Render filesystem resets and wipes
       SQLite + uploads. Options: paid Render disk for the Node service, or
       move the database to a managed Postgres/Supabase. Do NOT launch on the
@@ -39,6 +44,15 @@ end-to-end order.
 - [ ] USER ACTION — Live end-to-end test with a real card: quote → checkout →
       webhook → order marked paid → receipt email → refund + reconciliation.
       Use a small real amount; verify the money lands and the refund reverses it.
+- [x] DONE (Phase B, branch `vegarance-v3`) — Pluggable payment providers:
+      per-store provider selection (Flutterwave default, Stripe second slot,
+      503-until-configured, HMAC-verified Stripe webhooks, PaymentIntent
+      refunds). See `PAYMENTS.md`. Live merchant payments are STILL blocked
+      for all providers until the owner enables them per provider.
+- [ ] USER ACTION — Stripe keys (if Stripe is wanted): `STRIPE_SECRET_KEY`,
+      `STRIPE_WEBHOOK_SECRET`, `STRIPE_MODE`, plus a per-store Stripe
+      connection + read-access check. Until then Stripe stays honestly
+      inactive.
 
 ## 4. Email — USER ACTION
 - [ ] USER ACTION — Resend key + verified sending domain for the OWNER store
@@ -85,11 +99,19 @@ end-to-end order.
 - [x] DONE — Merchant email verification + password recovery flows
       (single-use hashed tokens, expiry, generic responses, session
       invalidation on reset, publish gate when platform email is configured).
-- [ ] DECISION — Merchant billing: NOT built. Merchant subscriptions/fees
-      need a provider decision (Flutterwave billing, Stripe, or manual) and
-      are a separate build.
-- [ ] DECISION — Custom merchant domains: NOT built. Documented next step;
-      needs DNS + per-domain TLS planning before it is scoped.
+- [x] DONE (Phase B, branch `vegarance-v3`) — Merchant billing scaffolding:
+      plans (Free/Starter/Growth), subscription state machine, 14-day
+      once-ever Starter trial, server-side feature gating (402), billing
+      standing in activation checks, owner admin set-plan (manual/none
+      only). See `MERCHANT-BILLING.md`. NO provider, NO charges, NO prices.
+- [ ] DECISION — Merchant billing provider (BLOCKING paid plans): pick
+      Stripe Billing, Flutterwave billing, or manual invoicing, then build
+      the provider adapter (checkout session + verified webhooks + dunning
+      + receipts) per `MERCHANT-BILLING.md`. Until then `BILLING_PROVIDER`
+      stays `none` and no merchant can be charged.
+- [ ] DECISION — Custom merchant domains: design documented (Phase B, see
+      `CUSTOM-DOMAINS.md`); NOT BUILT. Needs DNS + per-domain TLS planning
+      before it is scoped.
 - [ ] USER ACTION — Do NOT invite paying merchants until payments, email,
       storage, and the live end-to-end test are all done.
 

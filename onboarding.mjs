@@ -20,8 +20,11 @@ const SHOP_URL = slug => '/shops/' + slug;
 
 /* Input shape (all fields optional; missing evidence = step not done):
    {signedIn, emailVerified, verificationRequired, verificationSent,
-    store: null | {id, slug, name, published, connections: {cj, flutterwave,
-    resend}, productCount, saleReadyCount, checkoutEnabled}} */
+    billing: null | {effectivePlan, status, suspended},
+    store: null | {id, slug, name, published, paymentProvider,
+    connections: {cj, flutterwave, stripe, resend}, productCount,
+    saleReadyCount, checkoutEnabled,
+    activation: null | {ready, checks: [{name, ready, detail}]}}} */
 export function deriveOnboarding(input = {}) {
   const signedIn = input.signedIn === true;
   const verificationRequired = input.verificationRequired !== false;
@@ -31,7 +34,9 @@ export function deriveOnboarding(input = {}) {
   const productCount = Number.isSafeInteger(store?.productCount) ? store.productCount : 0;
   const saleReadyCount = Number.isSafeInteger(store?.saleReadyCount) ? store.saleReadyCount : 0;
   const supplierConnected = connections.cj?.connected === true;
-  const paymentsConnected = connections.flutterwave?.connected === true;
+  const paymentProvider = store?.paymentProvider === 'stripe' ? 'stripe' : 'flutterwave';
+  const paymentNames = {flutterwave: 'Flutterwave', stripe: 'Stripe'};
+  const paymentsConnected = connections[paymentProvider]?.connected === true;
   const published = store?.published === true && (emailVerified || !verificationRequired);
 
   const steps = ONBOARDING_STEPS.map(def => ({...def, status: 'locked', detail: '', action: null}));
@@ -80,23 +85,33 @@ export function deriveOnboarding(input = {}) {
   else if (productCount > 0) { pricing.status = 'current'; pricing.detail = 'Products exist but none are approved for sale yet. Review each product and approve it for sale.'; pricing.action = {label: 'Review products', href: PLATFORM_URL}; }
   else { pricing.status = 'todo'; pricing.detail = 'Add products first, then review and approve them for sale.'; }
 
-  // 7 — connect payments
+  // 7 — connect payments (per-store provider selection; Stripe is the
+  // second slot and stays inactive until its keys are saved + checked).
   const payments = byId('connect-payments');
   if (!store) { payments.status = 'locked'; payments.detail = 'Create your store first.'; }
   else if (paymentsConnected) {
     payments.status = 'done';
-    const mode = connections.flutterwave?.mode ? ` (${connections.flutterwave.mode} mode)` : '';
-    payments.detail = `Flutterwave is connected${mode}.` + (connections.flutterwave?.usdApproved ? ' USD approval confirmed by you.' : ' USD approval is not confirmed — confirm it in your dashboard if you sell in USD.');
+    const mode = connections[paymentProvider]?.mode ? ` (${connections[paymentProvider].mode} mode)` : '';
+    payments.detail = `${paymentNames[paymentProvider]} is connected${mode}.` + (paymentProvider === 'flutterwave' && !connections.flutterwave?.usdApproved ? ' USD approval is not confirmed — confirm it in your dashboard if you sell in USD.' : '');
     payments.action = {label: 'Manage connections', href: PLATFORM_URL};
-  } else { payments.status = 'current'; payments.detail = 'Payments are not connected. Checkout cannot collect payments until Flutterwave is connected.'; payments.action = {label: 'Connect Flutterwave in your dashboard', href: PLATFORM_URL}; }
+  } else { payments.status = 'current'; payments.detail = `Payments are not connected. Checkout cannot collect payments until ${paymentNames[paymentProvider]} is connected.`; payments.action = {label: `Connect ${paymentNames[paymentProvider]} in your dashboard`, href: PLATFORM_URL}; }
 
-  // 8 — publish
+  // 8 — publish. When the server supplies activation checks (Phase B),
+  // publish stays locked until the store is actually ready to sell:
+  // provider keys, storage, policies, tax review, billing standing.
+  // Without activation evidence (older callers) the legacy prior-steps
+  // gate applies unchanged.
   const publish = byId('publish');
   const priorsDone = ['verify-email', 'create-store', 'connect-supplier', 'import-products', 'set-pricing', 'connect-payments']
     .every(id => ['done', 'skipped'].includes(byId(id).status));
+  const activation = store?.activation || null;
+  const activationReady = activation ? activation.ready === true : true;
+  const firstFailing = activation && Array.isArray(activation.checks)
+    ? activation.checks.find(c => c.ready !== true) : null;
   if (!store) { publish.status = 'locked'; publish.detail = 'Create your store first.'; }
-  else if (published) { publish.status = 'done'; publish.detail = 'Your storefront is published and visitors can browse your visible products.'; publish.action = {label: 'Open your storefront', href: SHOP_URL(store.slug)}; }
+  else if (published && activationReady) { publish.status = 'done'; publish.detail = 'Your storefront is published and visitors can browse your visible products.'; publish.action = {label: 'Open your storefront', href: SHOP_URL(store.slug)}; }
   else if (!priorsDone) { publish.status = 'locked'; publish.detail = 'Finish the steps above first. Publishing is blocked until your store is ready.'; }
+  else if (!activationReady) { publish.status = 'locked'; publish.detail = 'Activation checks are not all passing yet — publishing is blocked until they pass.' + (firstFailing ? ` First failing check: ${firstFailing.name} — ${firstFailing.detail || 'not ready.'}` : ''); }
   else { publish.status = 'current'; publish.detail = 'Your store is ready. Publish it to make your storefront visible.'; publish.action = {label: 'Publish your store', href: '#publish'}; }
 
   const completed = steps.filter(s => s.status === 'done' || s.status === 'skipped').length;
@@ -107,6 +122,8 @@ export function deriveOnboarding(input = {}) {
     signedIn,
     emailVerified,
     verificationRequired,
+    billing: input.billing || null,
+    activation: activation ? {ready: activationReady, checks: activation.checks || []} : null,
     progress: {completed, total: steps.length, percent: Math.round((completed / steps.length) * 100)},
     nextStep: nextStep ? {id: nextStep.id, title: nextStep.title, detail: nextStep.detail, action: nextStep.action} : null,
     allDone: steps.every(s => s.status === 'done' || s.status === 'skipped'),

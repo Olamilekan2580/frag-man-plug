@@ -1,6 +1,7 @@
 import {createMerchantCommerce} from './merchant-commerce.mjs';
 import {createMerchantInventory} from './merchant-inventory.mjs';
 import {createMerchantConnections} from './merchant-connections.mjs';
+import {createMerchantBilling} from './merchant-billing.mjs';
 import {deriveOnboarding} from './onboarding.mjs';
 import {randomBytes, scrypt, timingSafeEqual, createHash} from 'node:crypto';
 import {promisify} from 'node:util';
@@ -30,7 +31,8 @@ export function createPlatform({db,body,send,sameOrigin,now=Date.now,env=process
  const mailer=mailerFactory({env});
  const connections=connectionsFactory({db,env,now});
  const inventory=createMerchantInventory({db,connections,now});
- const commerce=createMerchantCommerce({db,connections,inventory,env,now,onOrderEvent});
+ const billing=createMerchantBilling({db,now});
+ const commerce=createMerchantCommerce({db,connections,inventory,env,now,onOrderEvent,billing});
  const publicRates=new Map();
  function checkoutLimit(req){const ip=req.socket.remoteAddress,old=publicRates.get(ip),entry=old&&old.until>now()?old:{count:0,until:now()+60000};entry.count++;publicRates.set(ip,entry);if(publicRates.size>10000)for(const [k,v] of publicRates)if(v.until<now())publicRates.delete(k);if(entry.count>30)throw fail(429,'Too many checkout requests. Please try again shortly.');}
  const rates=new Map();let hashes=0;
@@ -79,8 +81,8 @@ export function createPlatform({db,body,send,sameOrigin,now=Date.now,env=process
    throw fail(404,'Unknown public API route');
   }
   if(!path.startsWith('/api/platform/'))return false;
-  const hook=path.match(/^\/api\/platform\/webhooks\/flutterwave\/([a-f0-9]{32})\/([a-f0-9-]{36})$/);
-  if(hook&&method==='POST'){let size=0,parts=[];for await(const chunk of req){size+=chunk.length;if(size>1000000)throw fail(413,'Webhook too large');parts.push(chunk);}send(res,200,await commerce.webhook(hook[1],hook[2],Buffer.concat(parts),req.headers['verif-hash']));return true;}
+  const hook=path.match(/^\/api\/platform\/webhooks\/(flutterwave|stripe)\/([a-f0-9]{32})\/([a-f0-9-]{36})$/);
+  if(hook&&method==='POST'){let size=0,parts=[];for await(const chunk of req){size+=chunk.length;if(size>1000000)throw fail(413,'Webhook too large');parts.push(chunk);}send(res,200,await commerce.webhook(hook[2],hook[3],Buffer.concat(parts),req.headers['verif-hash']||req.headers['stripe-signature']));return true;}
   if(method!=='GET')sameOrigin(req);
   if(path==='/api/platform/order-status'&&method==='GET'){checkoutLimit(req);send(res,200,await commerce.lookup(url.searchParams.get('token')));return true;}
   if(path==='/api/platform/order-status/verify'&&method==='POST'){checkoutLimit(req);send(res,200,await commerce.lookup((await body(req)).token,true));return true;}
@@ -111,19 +113,26 @@ export function createPlatform({db,body,send,sameOrigin,now=Date.now,env=process
     const byProvider=Object.fromEntries(status.connections.map(c=> [c.provider,{connected:!!c.connected,verifiedAt:c.verifiedAt||null,mode:c.mode||null,usdApproved:c.usdApproved||false}]));
     connectionSummary={storageConfigured:status.storageConfigured,providers:byProvider};
     const allProducts=products(chosen.id);
-    storeInput={id:chosen.id,slug:chosen.slug,name:chosen.name,published:chosen.published===true,connections:byProvider,productCount:allProducts.length,saleReadyCount:allProducts.filter(p=>inventory.approved(chosen.id,p)).length};
+    const activation=commerce.readiness(chosen.id);
+    storeInput={id:chosen.id,slug:chosen.slug,name:chosen.name,published:chosen.published===true,connections:byProvider,productCount:allProducts.length,saleReadyCount:allProducts.filter(p=>inventory.approved(chosen.id,p)).length,paymentProvider:activation.paymentProvider,activation:{ready:activation.ready,checks:activation.checks}};
    }
-   send(res,200,{...deriveOnboarding({signedIn:true,emailVerified:merchant.emailVerified,verificationRequired:mailer.configured,store:storeInput}),stores:allStores.map(s=>({id:s.id,slug:s.slug,name:s.name})),connections:connectionSummary});return true;}
+   send(res,200,{...deriveOnboarding({signedIn:true,emailVerified:merchant.emailVerified,verificationRequired:mailer.configured,store:storeInput,billing:billing.get(merchant.id)}),stores:allStores.map(s=>({id:s.id,slug:s.slug,name:s.name})),connections:connectionSummary});return true;}
   const merchant=session(req);
+  /* Merchant billing (Phase B scaffolding — no provider, no charges).
+     GET: current plan + limits. POST trial: one free 14-day Starter trial.
+     POST cancel: end a trial/active plan (effective plan becomes Free). */
+  if(path==='/api/platform/billing'&&method==='GET'){send(res,200,{billing:billing.get(merchant.id),plans:billing.plans()});return true;}
+  if(path==='/api/platform/billing/trial'&&method==='POST'){send(res,200,{billing:billing.startTrial(merchant.id)});return true;}
+  if(path==='/api/platform/billing/cancel'&&method==='POST'){send(res,200,{billing:billing.cancel(merchant.id)});return true;}
   if(path==='/api/platform/stores'&&method==='GET'){send(res,200,stores(merchant.id));return true;}
-  if(path==='/api/platform/stores'&&method==='POST'){const input=await body(req),slug=text(input.slug,48,true).toLowerCase();if(!/^[a-z0-9](?:[a-z0-9-]{1,46}[a-z0-9])$/.test(slug))throw fail(422,'Store URL must be 3–48 lowercase letters, numbers or hyphens');if(stores(merchant.id).length>=5)throw fail(422,'You can create up to five stores');const cfg=settings({...input,published:false}),storeId=id();try{db.prepare('INSERT INTO merchant_stores VALUES(?,?,?,?)').run(storeId,merchant.id,slug,JSON.stringify(cfg));}catch(e){if(e.code?.startsWith('ERR_SQLITE'))throw fail(409,'That store URL is already taken');throw e;}send(res,201,store(storeId,merchant.id));return true;}
+  if(path==='/api/platform/stores'&&method==='POST'){const gate=billing.gate(merchant.id,'create_store',{currentStores:stores(merchant.id).length});if(!gate.allowed)throw fail(402,gate.reason);const input=await body(req),slug=text(input.slug,48,true).toLowerCase();if(!/^[a-z0-9](?:[a-z0-9-]{1,46}[a-z0-9])$/.test(slug))throw fail(422,'Store URL must be 3–48 lowercase letters, numbers or hyphens');if(stores(merchant.id).length>=5)throw fail(422,'You can create up to five stores');const cfg=settings({...input,published:false}),storeId=id();try{db.prepare('INSERT INTO merchant_stores VALUES(?,?,?,?)').run(storeId,merchant.id,slug,JSON.stringify(cfg));}catch(e){if(e.code?.startsWith('ERR_SQLITE'))throw fail(409,'That store URL is already taken');throw e;}send(res,201,store(storeId,merchant.id));return true;}
   const operationRoute=path.match(/^\/api\/platform\/stores\/([a-f0-9]{32})\/(?:orders\/(MORD-[a-f0-9]{24})\/(refund|refund_reconcile|dispatch|fund|tracking|reconcile)|emails\/(MORD-[a-f0-9]{24}-(?:receipt|shipping|refund))\/retry)$/);
   if(operationRoute&&method==='POST'){store(operationRoute[1],merchant.id);if(operationRoute[4])send(res,200,commerce.retryEmail(operationRoute[1],operationRoute[4]));else{await commerce.action(operationRoute[1],operationRoute[2],operationRoute[3],await body(req));send(res,200,commerce.orders(operationRoute[1]));}return true;}
   const salesRoute=path.match(/^\/api\/platform\/stores\/([a-f0-9]{32})\/(?:sales|orders(?:\/(MORD-[a-f0-9]{24})\/verify)?)$/);
   if(salesRoute){store(salesRoute[1],merchant.id);if(path.endsWith('/sales')&&method==='GET')send(res,200,commerce.dashboard(salesRoute[1]));else if(path.endsWith('/sales')&&method==='PUT')send(res,200,commerce.configure(salesRoute[1],await body(req)));else if(salesRoute[2]&&method==='POST'){await commerce.verify(salesRoute[1],salesRoute[2]);send(res,200,commerce.orders(salesRoute[1]));}else if(path.endsWith('/orders')&&method==='GET')send(res,200,commerce.orders(salesRoute[1]));else throw fail(405,'Method not allowed');return true;}
   const stockRoute=path.match(/^\/api\/platform\/stores\/([a-f0-9]{32})\/inventory(?:\/(sync|settings))?$/);
   if(stockRoute){store(stockRoute[1],merchant.id);if(!stockRoute[2]&&method==='GET')send(res,200,inventory.status(stockRoute[1]));else if(stockRoute[2]==='sync'&&method==='POST'){const job=inventory.enqueue(stockRoute[1]);inventory.run().catch(()=>{});send(res,202,job);}else if(stockRoute[2]==='settings'&&method==='PUT')send(res,200,inventory.configure(stockRoute[1],await body(req)));else throw fail(405,'Method not allowed');return true;}
-  const integration=path.match(/^\/api\/platform\/stores\/([a-f0-9]{32})\/(?:connections(?:\/(cj|flutterwave|resend)(?:\/(verify))?)?|suppliers\/cj\/(search|import))$/);
+  const integration=path.match(/^\/api\/platform\/stores\/([a-f0-9]{32})\/(?:connections(?:\/(cj|flutterwave|stripe|resend)(?:\/(verify))?)?|suppliers\/cj\/(search|import))$/);
   if(integration){const cfg=store(integration[1],merchant.id),provider=integration[2];
    if(integration[4]==='search'&&method==='GET')send(res,200,await connections.search(cfg.id,url.searchParams.get('q')));
    else if(integration[4]==='import'&&method==='POST')send(res,201,await connections.importDraft(cfg.id,await body(req)));
@@ -137,11 +146,11 @@ export function createPlatform({db,body,send,sameOrigin,now=Date.now,env=process
   if(apiRoute&&publicApi){store(apiRoute[1],merchant.id);
    const [storeId,kind,sub,test]=[apiRoute[1],apiRoute[2],apiRoute[3],apiRoute[4]];
    if(kind==='api-keys'&&method==='GET'){send(res,200,publicApi.listKeys(storeId));return true;}
-   if(kind==='api-keys'&&method==='POST'){send(res,201,publicApi.createKey(storeId,await body(req)));return true;}
+   if(kind==='api-keys'&&method==='POST'){const input=await body(req);const gate=billing.gate(merchant.id,'api',{scopes: Array.isArray(input.scopes)?input.scopes:[]});if(!gate.allowed)throw fail(402,gate.reason);send(res,201,publicApi.createKey(storeId,input));return true;}
    if(kind==='api-keys'&&method==='DELETE'&&sub&&sub!=='deliveries'){send(res,200,publicApi.revokeKey(storeId,sub));return true;}
    if(kind==='webhooks'&&method==='GET'&&sub==='deliveries'){send(res,200,publicApi.deliveries(storeId));return true;}
    if(kind==='webhooks'&&method==='GET'&&!sub){send(res,200,publicApi.listEndpoints(storeId));return true;}
-   if(kind==='webhooks'&&method==='POST'&&!sub){send(res,201,publicApi.createEndpoint(storeId,await body(req)));return true;}
+   if(kind==='webhooks'&&method==='POST'&&!sub){const input=await body(req);const gate=billing.gate(merchant.id,'webhooks',{currentEndpoints:publicApi.listEndpoints(storeId).length});if(!gate.allowed)throw fail(402,gate.reason);send(res,201,publicApi.createEndpoint(storeId,input));return true;}
    if(kind==='webhooks'&&method==='DELETE'&&sub&&sub!=='deliveries'){send(res,200,publicApi.deleteEndpoint(storeId,sub));return true;}
    if(kind==='webhooks'&&method==='POST'&&sub&&sub!=='deliveries'&&test==='test'){send(res,200,await publicApi.testEndpoint(storeId,sub));return true;}
    throw fail(405,'Method not allowed');
@@ -153,7 +162,7 @@ export function createPlatform({db,body,send,sameOrigin,now=Date.now,env=process
  p.priceCents=Math.min(...(p.variants.some(v=>v.active)?p.variants.filter(v=>v.active):p.variants).map(v=>v.priceCents));if(input.saleReady!==undefined&&typeof input.saleReady!=='boolean')throw fail(422,'Invalid sale approval');p.saleReady=input.saleReady===true;
  if(p.saleReady&&(!p.description||!p.image||!p.variants.some(v=>inventory.available(cfg.id,p,v))))throw fail(422,'Sale approval needs a description, image, and fresh available supplier options priced above cost');
  }else if(input.saleReady===true)throw fail(422,'Real sale approval requires a connected supplier');db.prepare('UPDATE merchant_products SET document=? WHERE id=? AND store_id=?').run(JSON.stringify(p),productId,cfg.id);send(res,200,{...p,id:productId});}else throw fail(405,'Method not allowed');return true;}
-  if(method==='GET')send(res,200,products(cfg.id));else if(method==='POST'){const p=product(await body(req)),productId=id();db.prepare('INSERT INTO merchant_products VALUES(?,?,?)').run(productId,cfg.id,JSON.stringify(p));send(res,201,{...p,id:productId});}else throw fail(405,'Method not allowed');return true;
+  if(method==='GET')send(res,200,products(cfg.id));else if(method==='POST'){const gate=billing.gate(merchant.id,'add_product',{currentProducts:products(cfg.id).length});if(!gate.allowed)throw fail(402,gate.reason);const p=product(await body(req)),productId=id();db.prepare('INSERT INTO merchant_products VALUES(?,?,?)').run(productId,cfg.id,JSON.stringify(p));send(res,201,{...p,id:productId});}else throw fail(405,'Method not allowed');return true;
  }
- return {route,start(){inventory.start();commerce.start();},stop(){inventory.stop();commerce.stop();}};
+ return {route,billing,start(){inventory.start();commerce.start();},stop(){inventory.stop();commerce.stop();}};
 }

@@ -124,6 +124,14 @@
   }
 
   function render(data) {
+    var billingEl = document.getElementById('onboardingBilling');
+    if (billingEl) {
+      if (data.billing) {
+        billingEl.textContent = 'Plan: ' + data.billing.effectivePlan + ' (' + data.billing.status + ') · Provider: ' + data.billing.provider + ' (no charges — no billing provider connected) · Limits: ' + data.billing.limits.maxStores + ' store(s), ' + data.billing.limits.maxProducts + ' products per store, API: ' + data.billing.limits.apiAccess + (data.billing.trialEndsAt ? ' · Trial ends ' + new Date(data.billing.trialEndsAt).toLocaleDateString() : '');
+      } else {
+        billingEl.textContent = 'Plan: Free — no billing provider is connected, so nothing here charges you.';
+      }
+    }
     barEl.style.width = data.progress.percent + '%';
     progressEl.textContent = data.progress.completed + ' of ' + data.progress.total + ' steps complete (' + data.progress.percent + '%).';
     if (data.allDone) {

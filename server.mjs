@@ -11,6 +11,7 @@ import {createSupport} from './ai-support.mjs';
 import {parseCSV} from './csv-import.mjs';
 import {applyRules,validateRules} from './pricing.mjs';
 import {createSupplierSync} from './supplier-sync.mjs';
+import {describeStorage} from './storage.mjs';
 const cj=createCJ();
 const printful=createPrintful();
 const printify=createPrintify();
@@ -81,6 +82,8 @@ const server=http.createServer(async(req,res)=>{
   if(path==='/api/order-status/verify'&&method==='POST'){sameOrigin(req);publicLimit(req);return send(res,200,await commerce.lookup((await body(req)).token,true));}
   if(path==='/api/ai/support'&&method==='POST'){sameOrigin(req);publicLimit(req);const b=await body(req);return send(res,200,await support.answer({question:b.question,orderToken:b.orderToken}));}
   if(path==='/api/health')return send(res,200,{ok:true,storage:'sqlite',time:new Date().toISOString(),
+   storageDetail:describeStorage(process.env),
+   billing:{provider:process.env.BILLING_PROVIDER||'none',enabled:false,chargesLive:false,note:'No billing provider is connected. Merchant billing is scaffolding only — no charges are possible. See MERCHANT-BILLING.md.'},
    suppliers:{cj:{configured:cj.configured},printful:{configured:printful.configured},printify:{configured:printify.configured},aliexpress:{configured:aliexpress.configured},csv:{configured:true},ai:{configured:ai.configured}},
    sales:{enabled:commerce.publicConfig().salesEnabled,ready:commerce.readiness().ready},
    webhooks:publicApi.stats()});
@@ -125,6 +128,12 @@ const server=http.createServer(async(req,res)=>{
   }
   if(path.startsWith('/api/')){
    owner(req);if(method!=='GET')sameOrigin(req);
+   /* Owner-only manual billing administration (Phase B). Sets a
+      merchant's plan with provider 'manual' or 'none' — e.g. a comped or
+      manually-invoiced plan. It never charges anyone and cannot set a
+      Stripe/Flutterwave provider record: those come only from a real
+      provider webhook once a provider is plugged in. */
+   if(path==='/api/billing/admin/set-plan'&&method==='POST'){const b=await body(req);if(typeof b.merchantId!=='string'||!/^[a-f0-9]{32}$/.test(b.merchantId))throw fail(422,'Invalid merchant id');if(b.provider!==undefined&&!['manual','none'].includes(b.provider))throw fail(422,'Admin set-plan only allows provider manual or none');return send(res,200,{billing:platform.billing.setPlan(b.merchantId,{plan:b.plan,status:b.status,provider:b.provider||'manual',currentPeriodEndsAt:b.currentPeriodEndsAt})});}
    if(path==='/api/sales'&&method==='GET')return send(res,200,commerce.dashboard());
    if(path==='/api/sales'&&method==='PUT')return send(res,200,commerce.configure(await body(req)));
    const emailRetry=path.match(/^\/api\/sales\/emails\/(VEGA-[a-f0-9]+-(?:receipt|shipping|refund))\/retry$/);if(emailRetry&&method==='POST')return send(res,200,commerce.retryEmail(emailRetry[1]));

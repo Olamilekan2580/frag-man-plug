@@ -162,19 +162,58 @@ which did not exist as routes and returned 404. They now point at
 `verify-email.html` / `reset-password.html`, which call the real API
 endpoints.
 
+
+## 6. Phase B — P0 gaps (merchant billing, pluggable payments, durable storage, activation, custom domains)
+
+**Ground truth unchanged:** multi-merchant platform, no invented keys /
+accounts / live integrations / fake data. No live billing charges, no
+live merchant payments, no claimed live integrations.
+
+### What Phase B added
+
+| Area | Module(s) | What is real | What is explicitly NOT real |
+|---|---|---|---|
+| Merchant billing | `merchant-billing.mjs`, `MERCHANT-BILLING.md` | Plans (Free/Starter/Growth), subscription state machine (none/trialing/active/past_due/cancelled/trial_expired), 14-day once-ever Starter trial, trial expiry + past-due grace (7d) downgrade to Free, server-side gating (402) on store/product/API/webhook creation, billing-standing activation check, owner admin set-plan (`manual`/`none` only) | NO billing provider, NO charges, NO prices stated anywhere, NO Stripe/Flutterwave billing adapter. `billingEnabled: false`, `chargesLive: false`. Provider choice is the owner's blocking decision. |
+| Pluggable payments | `payment-providers.mjs`, `PAYMENTS.md` | One six-method provider interface; per-store `paymentProvider` selection (Flutterwave default, Stripe second slot); Stripe Checkout Sessions + HMAC-verified webhooks + PaymentIntent refunds, all 503-until-configured; per-provider activation checks + webhook URLs; order payment bindings carry the provider | Stripe is NOT CONFIGURED until keys are supplied. Live merchant payments are NOT enabled for any provider (non-test bindings still refused with 503). No PayPal/Paystack. Owner store still Flutterwave-only. |
+| Durable storage | `storage.mjs`, `STORAGE.md`, `backup.mjs --verify` | `describeStorage()` truthfully reports durable/ephemeral + `DATABASE_URL` recognised-but-not-wired; backup verification (`PRAGMA integrity_check`, required tables, counts); health endpoint exposes `storageDetail` + billing status | No Postgres driver. `DATABASE_URL` alone changes nothing. Free Render still resets — the code says so. |
+| Activation | `merchant-commerce.mjs` readiness, `onboarding.mjs` publish gate | Readiness checks now cover the selected payment provider, billing standing, and durable storage (via `describeStorage`), each with an honest `detail`. The onboarding wizard's publish step stays locked until activation passes; server checkout gating unchanged (still enforced in `configure`/`quote`/`checkout`) | Publishing the browseable storefront (PUT) is still email-gated only; activation gates *selling*, not browsing. |
+| Custom domains | `CUSTOM-DOMAINS.md` | Design only: verification (DNS TXT), per-domain TLS options, Host routing, webhook-stays-on-platform-host, abuse limits | NOT BUILT. Billing gate always refuses. No routing, no DNS, no TLS code. |
+
+### Data-flow deltas (Phase B)
+
+- Billing: `platform.mjs` creates one `createMerchantBilling({db})` and
+  passes it to `createMerchantCommerce({billing})`. Merchant routes gate
+  on `billing.gate(...)`; the onboarding endpoint returns
+  `billing: billing.get(merchantId)` and per-store `activation` from
+  `commerce.readiness(storeId)`.
+- Payments: `merchant-connections.mjs` providers are now
+  `cj / flutterwave / stripe / resend`; `merchant_payment_bindings`
+  carries a `provider` column (migrated with a default of
+  `'flutterwave'`). Webhook route accepts
+  `/api/platform/webhooks/{flutterwave|stripe}/{storeId}/{version}` and
+  forwards the provider's signature header (`verif-hash` or
+  `Stripe-Signature`).
+- Storage: `server.mjs` `/api/health` adds `storageDetail` and a
+  `billing` block. `merchant-commerce` readiness uses
+  `describeStorage(env)` for the storage check.
+
 ## 5. Deliberately deferred (later phases — NOT in Phase A)
 
 Per the research build order (`dropshipping-platform-research.md` §8):
 
-- **Merchant billing** (how Vegarance charges merchants) — NOT BUILT.
-  Needs a provider decision + subscription/commission logic + receipts +
-  dunning. Phase A changes nothing about money flows.
-- **Live payments beyond Flutterwave** (PayPal / Stripe / Paystack).
-- **Durable storage + production deploy** (Render disk or managed DB;
-  backup/restore verification). The v3 branch touches no Render service
-  and no live config.
-- **Custom merchant domains** — NOT BUILT. Merchants live at
-  `/shops/{slug}`.
+- **Merchant billing provider** — the state machine + gating + admin
+  views are built (Phase B); the provider adapter (Stripe/Flutterwave/
+  manual), prices, checkout session, webhook handler, dunning, and
+  receipts are NOT built. Provider choice is the owner's decision.
+- **Live payments beyond Flutterwave** — Stripe slot built (Phase B) but
+  not configured; live merchant payments still blocked for all providers.
+  No PayPal / Paystack provider exists.
+- **Durable storage + production deploy** — described + backup
+  verification built (Phase B); the Postgres migration is NOT built and
+  no Render service was touched. Provisioning the paid disk is still a
+  USER ACTION.
+- **Custom merchant domains** — design documented (Phase B, see
+  `CUSTOM-DOMAINS.md`); NOT BUILT. Merchants live at `/shops/{slug}`.
 - **Auto-ordering depth** — Printful/Printify confirm flow (explicit
   merchant opt-in + charge warning), AliExpress tracking capture.
 - **Discounts / coupons / gift cards; abandoned-checkout emails.**

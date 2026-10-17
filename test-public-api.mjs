@@ -185,6 +185,11 @@ import {createPublicApi, signWebhookBody, verifyWebhookSignature} from './public
     const mCookie = signup.cookie;
     const storeRes = await req('/api/platform/stores', 'POST', {name: 'First Store', slug: 'first-store'}, {Cookie: mCookie});
     const sid = storeRes.data.id;
+    // Phase B billing: outbound webhooks need Starter+, so start the free trial first.
+    // Read-only API keys stay available on Free (tested above via the key creation below).
+    const trial = await req('/api/platform/billing/trial', 'POST', {}, {Cookie: mCookie});
+    assert.equal(trial.status, 200);
+    assert.equal(trial.data.billing.effectivePlan, 'starter');
     const mKey = await req(`/api/platform/stores/${sid}/api-keys`, 'POST', {name: 'shop-app', scopes: ['read:products', 'read:orders']}, {Cookie: mCookie});
     assert.equal(mKey.status, 201);
     const mProducts = await req('/api/v1/products', 'GET', undefined, {Authorization: 'Bearer ' + mKey.data.key});
