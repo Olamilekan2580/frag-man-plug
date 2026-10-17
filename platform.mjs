@@ -7,7 +7,7 @@ const derive=promisify(scrypt), fail=(status,message)=>Object.assign(new Error(m
 const hash=s=>createHash('sha256').update(s).digest('hex');
 const id=()=>randomBytes(16).toString('hex');
 const text=(value,max,required=false)=>{if(typeof value!=='string'||value.length>max||(required&&!value.trim()))throw fail(422,'Invalid or missing text');return value.trim();};
-export function createPlatform({db,body,send,sameOrigin,now=Date.now,env=process.env,connectionsFactory=createMerchantConnections}){
+export function createPlatform({db,body,send,sameOrigin,now=Date.now,env=process.env,connectionsFactory=createMerchantConnections,publicApi=null,onOrderEvent=null}){
  db.exec(`PRAGMA foreign_keys=ON;
  CREATE TABLE IF NOT EXISTS merchants(id TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL,name TEXT NOT NULL,salt TEXT NOT NULL,password_hash TEXT NOT NULL,created_at INTEGER NOT NULL);
  CREATE TABLE IF NOT EXISTS merchant_sessions(token_hash TEXT PRIMARY KEY,merchant_id TEXT NOT NULL REFERENCES merchants(id),expires INTEGER NOT NULL);
@@ -15,7 +15,7 @@ export function createPlatform({db,body,send,sameOrigin,now=Date.now,env=process
  CREATE TABLE IF NOT EXISTS merchant_products(id TEXT PRIMARY KEY,store_id TEXT NOT NULL REFERENCES merchant_stores(id),document TEXT NOT NULL);`);
  const connections=connectionsFactory({db,env,now});
  const inventory=createMerchantInventory({db,connections,now});
- const commerce=createMerchantCommerce({db,connections,inventory,env,now});
+ const commerce=createMerchantCommerce({db,connections,inventory,env,now,onOrderEvent});
  const publicRates=new Map();
  function checkoutLimit(req){const ip=req.socket.remoteAddress,old=publicRates.get(ip),entry=old&&old.until>now()?old:{count:0,until:now()+60000};entry.count++;publicRates.set(ip,entry);if(publicRates.size>10000)for(const [k,v] of publicRates)if(v.until<now())publicRates.delete(k);if(entry.count>30)throw fail(429,'Too many checkout requests. Please try again shortly.');}
  const rates=new Map();let hashes=0;
@@ -30,7 +30,33 @@ export function createPlatform({db,body,send,sameOrigin,now=Date.now,env=process
  const stores=merchantId=>db.prepare('SELECT id,slug,document FROM merchant_stores WHERE merchant_id=? ORDER BY rowid').all(merchantId).map(r=>({...JSON.parse(r.document),id:r.id,slug:r.slug}));
  function settings(input){const name=text(input.name,80,true),description=text(input.description??'',1200),supportEmail=text(input.supportEmail??'',254);if(supportEmail&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supportEmail))throw fail(422,'Enter a valid support email');const accent=input.accent??'#245b49';if(!/^#[a-fA-F0-9]{6}$/.test(accent)||typeof input.published!=='boolean')throw fail(422,'Invalid store appearance');return {name,description,supportEmail,accent,published:input.published,currency:'USD',checkoutEnabled:false};}
  function product(input){const name=text(input.name,160,true),description=text(input.description??'',1600),image=text(input.image??'',2000);if(image){let u;try{u=new URL(image);}catch{throw fail(422,'Use an HTTPS image URL');}if(u.protocol!=='https:'||u.username||u.password)throw fail(422,'Use an HTTPS image URL');}if(!Number.isSafeInteger(input.priceCents)||input.priceCents<1||input.priceCents>1000000||typeof input.visible!=='boolean')throw fail(422,'Enter a valid USD price and visibility');return {name,description,image,priceCents:input.priceCents,visible:input.visible};}
- async function route(req,res,url){const path=url.pathname,method=req.method;if(!path.startsWith('/api/platform/'))return false;
+ async function route(req,res,url){const path=url.pathname,method=req.method;
+  // Public API (API-key auth) for merchant stores. Keys for the owner store
+  // fall through to server.mjs. No Origin requirement: API clients are not browsers.
+  if(publicApi&&path.startsWith('/api/v1/')){
+   let auth;try{auth=publicApi.authenticate(req);}catch{return false;}
+   if(auth.storeId==='owner')return false;
+   const storeRow=db.prepare('SELECT id FROM merchant_stores WHERE id=?').get(auth.storeId);
+   if(!storeRow)throw fail(404,'Store not found');
+   const productMatch=path.match(/^\/api\/v1\/products\/([a-f0-9]{32})$/);
+   if(path==='/api/v1/products'&&method==='GET'){publicApi.requireScope(auth,'read:products');
+    const limit=Math.min(100,Math.max(1,Number(url.searchParams.get('limit'))||20)),offset=Math.max(0,Number(url.searchParams.get('offset'))||0);
+    const all=products(auth.storeId).filter(p=>p.visible).map(p=>({id:p.id,name:p.name,description:p.description,image:p.image,priceCents:p.priceCents,visible:true,saleReady:inventory.approved(auth.storeId,p),variants:p.variants?.filter(v=>v.active!==false).map(v=>({id:v.id,label:v.label,priceCents:v.priceCents,inStock:inventory.available(auth.storeId,p,v)}))}));
+    send(res,200,{total:all.length,limit,offset,products:all.slice(offset,offset+limit)});return true;}
+   if(productMatch&&method==='GET'){publicApi.requireScope(auth,'read:products');
+    const p=products(auth.storeId).find(p=>p.id===productMatch[1]&&p.visible);if(!p)throw fail(404,'Product not found');
+    send(res,200,{id:p.id,name:p.name,description:p.description,image:p.image,priceCents:p.priceCents,visible:true,saleReady:inventory.approved(auth.storeId,p),variants:p.variants});return true;}
+   const orderMatch=path.match(/^\/api\/v1\/orders\/(MORD-[a-f0-9]{24})$/);
+   if(path==='/api/v1/orders'&&method==='GET'){publicApi.requireScope(auth,'read:orders');
+    const limit=Math.min(100,Math.max(1,Number(url.searchParams.get('limit'))||20)),offset=Math.max(0,Number(url.searchParams.get('offset'))||0);
+    const all=commerce.orders(auth.storeId).map(o=>({id:o.id,status:o.status,paymentStatus:o.paymentStatus,paymentMode:o.paymentMode,lines:o.lines,subtotalCents:o.subtotalCents,shippingCents:o.shippingCents,taxCents:o.taxCents,totalCents:o.totalCents,shippingMethod:o.shippingMethod,tracking:o.tracking||null,email:o.email,address:o.address,createdAt:o.createdAt,paidAt:o.paidAt||null}));
+    send(res,200,{total:all.length,limit,offset,orders:all.slice(offset,offset+limit)});return true;}
+   if(orderMatch&&method==='GET'){publicApi.requireScope(auth,'read:orders');
+    const found=commerce.orders(auth.storeId).find(o=>o.id===orderMatch[1]);if(!found)throw fail(404,'Order not found');
+    send(res,200,{id:found.id,status:found.status,paymentStatus:found.paymentStatus,paymentMode:found.paymentMode,lines:found.lines,subtotalCents:found.subtotalCents,shippingCents:found.shippingCents,taxCents:found.taxCents,totalCents:found.totalCents,shippingMethod:found.shippingMethod,tracking:found.tracking||null,email:found.email,address:found.address,createdAt:found.createdAt,paidAt:found.paidAt||null});return true;}
+   throw fail(404,'Unknown public API route');
+  }
+  if(!path.startsWith('/api/platform/'))return false;
   const hook=path.match(/^\/api\/platform\/webhooks\/flutterwave\/([a-f0-9]{32})\/([a-f0-9-]{36})$/);
   if(hook&&method==='POST'){let size=0,parts=[];for await(const chunk of req){size+=chunk.length;if(size>1000000)throw fail(413,'Webhook too large');parts.push(chunk);}send(res,200,await commerce.webhook(hook[1],hook[2],Buffer.concat(parts),req.headers['verif-hash']));return true;}
   if(method!=='GET')sameOrigin(req);
@@ -61,6 +87,19 @@ export function createPlatform({db,body,send,sameOrigin,now=Date.now,env=process
    else if(provider&&!integration[3]&&method==='PUT')send(res,200,connections.save(cfg.id,provider,await body(req)));
    else if(provider&&!integration[3]&&method==='DELETE')send(res,200,connections.remove(cfg.id,provider));
    else throw fail(405,'Method not allowed');return true;
+  }
+  const apiRoute=path.match(/^\/api\/platform\/stores\/([a-f0-9]{32})\/(api-keys|webhooks)(?:\/([a-f0-9]{32}|deliveries)(?:\/(test))?)?$/);
+  if(apiRoute&&publicApi){store(apiRoute[1],merchant.id);
+   const [storeId,kind,sub,test]=[apiRoute[1],apiRoute[2],apiRoute[3],apiRoute[4]];
+   if(kind==='api-keys'&&method==='GET'){send(res,200,publicApi.listKeys(storeId));return true;}
+   if(kind==='api-keys'&&method==='POST'){send(res,201,publicApi.createKey(storeId,await body(req)));return true;}
+   if(kind==='api-keys'&&method==='DELETE'&&sub&&sub!=='deliveries'){send(res,200,publicApi.revokeKey(storeId,sub));return true;}
+   if(kind==='webhooks'&&method==='GET'&&sub==='deliveries'){send(res,200,publicApi.deliveries(storeId));return true;}
+   if(kind==='webhooks'&&method==='GET'&&!sub){send(res,200,publicApi.listEndpoints(storeId));return true;}
+   if(kind==='webhooks'&&method==='POST'&&!sub){send(res,201,publicApi.createEndpoint(storeId,await body(req)));return true;}
+   if(kind==='webhooks'&&method==='DELETE'&&sub&&sub!=='deliveries'){send(res,200,publicApi.deleteEndpoint(storeId,sub));return true;}
+   if(kind==='webhooks'&&method==='POST'&&sub&&sub!=='deliveries'&&test==='test'){send(res,200,await publicApi.testEndpoint(storeId,sub));return true;}
+   throw fail(405,'Method not allowed');
   }
   const match=path.match(/^\/api\/platform\/stores\/([a-f0-9]{32})(?:\/products(?:\/([a-f0-9]{32}))?)?$/);if(!match)throw fail(404,'Unknown platform route');const cfg=store(match[1],merchant.id);
   if(path.endsWith(match[1])){if(method==='GET')send(res,200,{store:cfg,products:products(cfg.id)});else if(method==='PUT'){const updated=settings(await body(req));db.prepare('UPDATE merchant_stores SET document=? WHERE id=? AND merchant_id=?').run(JSON.stringify(updated),cfg.id,merchant.id);send(res,200,store(cfg.id,merchant.id));}else throw fail(405,'Method not allowed');return true;}

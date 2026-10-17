@@ -4,7 +4,7 @@ import {createPayments,createEmail} from './payment-client.mjs';
 const fail=(status,message)=>Object.assign(new Error(message),{status});
 const US_STATES=new Set('AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC'.split(' '));
 const cents=n=>Math.round(n*100);
-export function createCommerce({db,cj,env=process.env,payments=createPayments(),email=createEmail(),tax=createTax(),now=Date.now}){
+export function createCommerce({db,cj,env=process.env,payments=createPayments(),email=createEmail(),tax=createTax(),now=Date.now,onOrderEvent=null}){
   db.exec(`CREATE TABLE IF NOT EXISTS sales_config(id INTEGER PRIMARY KEY CHECK(id=1),document TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS checkout_quotes(id TEXT PRIMARY KEY,document TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS sales_orders(id TEXT PRIMARY KEY,token TEXT UNIQUE NOT NULL,document TEXT NOT NULL);
@@ -12,6 +12,15 @@ export function createCommerce({db,cj,env=process.env,payments=createPayments(),
   const defaults={enabled:false,businessName:'',supportEmail:'',shippingPolicy:'',returnPolicy:'',privacyPolicy:'',terms:'',taxReviewed:false,taxRates:{},processingDays:0};
   const config=()=>({...defaults,...JSON.parse(db.prepare('SELECT document FROM sales_config WHERE id=1').get()?.document||'{}')});
   const save=o=>db.prepare('INSERT INTO sales_orders VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET document=excluded.document').run(o.id,o.token,JSON.stringify(o));
+  // Outbound webhook payload: the store's own order summary. No tokens,
+  // no session data, no keys. Email/address included — fulfilment
+  // automations need them; treat webhook payloads as confidential.
+  // Emission never breaks checkout: enqueue-only, errors swallowed.
+  const eventOrder=o=>({id:o.id,status:o.status,paymentStatus:o.paymentStatus,paymentMode:o.paymentMode,
+    lines:o.lines.map(({name,option,qty,unitCents})=>({name,option,qty,unitCents})),
+    subtotalCents:o.subtotalCents,shippingCents:o.shippingCents,taxCents:o.taxCents,totalCents:o.totalCents,
+    shippingMethod:o.shippingMethod,tracking:o.tracking||null,email:o.email,address:o.address,createdAt:o.createdAt,paidAt:o.paidAt||null});
+  const emit=(type,o)=>{try{onOrderEvent?.(type,eventOrder(o));}catch{}};
   const get=id=>{const row=db.prepare('SELECT document FROM sales_orders WHERE id=?').get(id);if(!row)throw fail(404,'Order not found');return JSON.parse(row.document);};
   const orders=()=>db.prepare('SELECT document FROM sales_orders ORDER BY rowid DESC').all().map(r=>JSON.parse(r.document));
   let site='';try{const u=new URL(env.SITE_URL);if(u.protocol==='https:'&&!u.username&&!u.password&&u.pathname==='/')site=u.origin;}catch{}
@@ -107,7 +116,7 @@ export function createCommerce({db,cj,env=process.env,payments=createPayments(),
         subtotalCents:q.subtotalCents,shippingCents:choice.cents,taxCents:choice.taxCents,totalCents:choice.totalCents,shippingMethod:choice.name,
         consent:{acceptedAt:now(),terms:config().terms,returnPolicy:config().returnPolicy,version:createHash('sha256').update(config().terms+'\n'+config().returnPolicy).digest('hex')},createdAt:now(),status:'Awaiting payment',paymentStatus:'unpaid',fulfillment:{state:'not_started'},paymentMode:payments.live?'live':'test'};
       save(o);
-      try{const session=await payments.checkout(o,site);o.checkoutId=session.id;o.checkoutUrl=session.url;save(o);return {url:session.url,token:o.token};}
+      try{const session=await payments.checkout(o,site);o.checkoutId=session.id;o.checkoutUrl=session.url;save(o);emit('order.created',o);return {url:session.url,token:o.token};}
       catch(e){o.status='Checkout needs attention';save(o);throw e;}
     })().finally(()=>checkoutPending.delete(q.id));checkoutPending.set(q.id,task);return task;
   }
@@ -124,7 +133,7 @@ export function createCommerce({db,cj,env=process.env,payments=createPayments(),
         o.paymentStatus='review';o.status='Payment needs review';save(o);return o;
       }
       // Durable payment state is saved before any notification or fulfillment.
-      o.paymentStatus='paid';o.paidAt=now();o.transactionId=data.id;o.status='Paid';save(o);queueEmail(o,'receipt');return o;
+      o.paymentStatus='paid';o.paidAt=now();o.transactionId=data.id;o.status='Paid';save(o);queueEmail(o,'receipt');emit('order.paid',o);return o;
     })().finally(()=>verificationPending.delete(id));verificationPending.set(id,task);return task;
   }
   async function webhook(raw,header){
@@ -192,10 +201,12 @@ export function createCommerce({db,cj,env=process.env,payments=createPayments(),
     if(!o.fulfillment.orderId)return;
     const details=await cj.order(o.fulfillment.orderId);o=get(o.id);
     if(o.paymentStatus!=='paid')return;
+    const before=o.status;
     if(details.trackNumber){o.tracking={number:String(details.trackNumber).slice(0,200),carrier:String(details.trackingProvider||details.logisticName||'').slice(0,100),url:/^https:\/\//.test(details.trackingUrl||'')?details.trackingUrl:''};
       if(o.status!=='Delivered')o.status='Shipped';queueEmail(o,'shipping');}
     if(details.orderStatus==='DELIVERED')o.status='Delivered';
     o.lastTrackingAt=now();save(o);
+    if(o.status!==before)emit(o.status==='Delivered'?'order.delivered':'order.shipped',o);
   }
   // Ambiguous supplier writes are never automatically repeated after a crash.
   for(const o of orders())if(['creating','funding'].includes(o.fulfillment.state)){o.fulfillment.state='needs_review';o.status='Supplier operation interrupted — review required';save(o);}
@@ -209,7 +220,7 @@ export function createCommerce({db,cj,env=process.env,payments=createPayments(),
         if(o.paymentStatus==='refunded')queueEmail(o,'refund');
         if(o.refund?.id&&o.refund.state==='pending'){
           try{const r=await payments.refundStatus(o.refund.id);const current=get(o.id);if(['completed-mpgs','completed-preauth','completed-bank-transfer','completed-momo','completed-offline'].includes(r.status)&&cents(Number(r.amount_refunded))===o.totalCents&&String(r.tx_id)===String(o.transactionId)){
-            current.refund.state='processed';current.paymentStatus='refunded';current.status='Refunded';save(current);queueEmail(current,'refund');
+            current.refund.state='processed';current.paymentStatus='refunded';current.status='Refunded';save(current);queueEmail(current,'refund');emit('order.refunded',current);
           }else if(['failed','needs-attention'].includes(r.status)){current.refund.state='needs_review';current.status='Refund needs review';save(current);}}catch{}
         }
         if(o.paymentStatus==='paid'&&o.fulfillment.orderId&&o.status!=='Delivered'&&now()-(o.lastTrackingAt||0)>10*60000&&!operations.has(o.id))try{await tracking(o);}catch{}

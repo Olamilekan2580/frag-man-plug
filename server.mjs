@@ -3,12 +3,15 @@ import http from 'node:http';
 import {createCommerce} from './commerce.mjs';
 import {createCJ} from './cj-client.mjs';
 import {createPrintful} from './printful-client.mjs';
+import {createAliExpress} from './aliexpress-client.mjs';
+import {createPublicApi} from './public-api.mjs';
 import {createAI} from './ai-client.mjs';
 import {parseCSV} from './csv-import.mjs';
 import {applyRules,validateRules} from './pricing.mjs';
 import {createSupplierSync} from './supplier-sync.mjs';
 const cj=createCJ();
 const printful=createPrintful();
+const aliexpress=createAliExpress();
 const ai=createAI();
 import {readFileSync,existsSync,mkdirSync,writeFileSync,statSync} from 'node:fs';
 import {resolve,extname,basename} from 'node:path';
@@ -23,7 +26,8 @@ const fresh=!existsSync(resolve(data,'store.sqlite'));
 const db=new DatabaseSync(resolve(data,'store.sqlite'));db.exec('PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS products(id TEXT PRIMARY KEY, document TEXT NOT NULL); CREATE TABLE IF NOT EXISTS settings(id INTEGER PRIMARY KEY CHECK(id=1),document TEXT NOT NULL); CREATE TABLE IF NOT EXISTS orders(id TEXT PRIMARY KEY,document TEXT NOT NULL);');
 if(fresh){const context={};vm.createContext(context);vm.runInContext(readFileSync(resolve(root,'products.js'),'utf8')+';globalThis.seed=PRODUCTS',context);const insert=db.prepare('INSERT INTO products VALUES(?,?)');db.exec('BEGIN');for(const p of context.seed)insert.run(p.id,JSON.stringify({...p,inStock:true}));db.exec('COMMIT');}
 const sync=createSupplierSync({db,cj});sync.start();
-const commerce=createCommerce({db,cj});commerce.start();
+const publicApi=createPublicApi({db});publicApi.start();
+const commerce=createCommerce({db,cj,onOrderEvent:(type,payload)=>publicApi.emit('owner',type,payload)});commerce.start();
 const sessions=new Map(),attempts=new Map();const salt=randomBytes(16),password=process.env.ADMIN_PASSWORD||'',passwordHash=password?scryptSync(password,salt,64):null;
 if(password&&password.length<12)throw new Error('ADMIN_PASSWORD must contain at least 12 characters');
 const catalog=()=>db.prepare('SELECT document FROM products ORDER BY rowid').all().map(r=>JSON.parse(r.document));
@@ -55,7 +59,7 @@ function publicLimit(req){
  if(publicRates.size>10000)for(const [key,value] of publicRates)if(value.until<Date.now())publicRates.delete(key);
  if(entry.count>30)throw fail(429,'Too many requests. Please try again in a minute.');
 }
-const platform=createPlatform({db,body,send,sameOrigin});platform.start();
+const platform=createPlatform({db,body,send,sameOrigin,publicApi,onOrderEvent:(storeId,type,payload)=>publicApi.emit(storeId,type,payload)});platform.start();
 const mime={'.html':'text/html; charset=utf-8','.css':'text/css','.js':'text/javascript','.svg':'image/svg+xml','.webp':'image/webp','.png':'image/png','.jpg':'image/jpeg','.ttf':'font/ttf'};
 const server=http.createServer(async(req,res)=>{
  res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','same-origin');res.setHeader('X-Frame-Options','DENY');
@@ -71,7 +75,36 @@ const server=http.createServer(async(req,res)=>{
   if(path==='/api/checkout'&&method==='POST'){sameOrigin(req);publicLimit(req);return send(res,201,await commerce.checkout(await body(req)));}
   if(path==='/api/order-status'&&method==='GET')return send(res,200,await commerce.lookup(url.searchParams.get('token')));
   if(path==='/api/order-status/verify'&&method==='POST'){sameOrigin(req);publicLimit(req);return send(res,200,await commerce.lookup((await body(req)).token,true));}
-  if(path==='/api/health')return send(res,200,{ok:true,storage:'sqlite'});
+  if(path==='/api/health')return send(res,200,{ok:true,storage:'sqlite',time:new Date().toISOString(),
+   suppliers:{cj:{configured:cj.configured},printful:{configured:printful.configured},aliexpress:{configured:aliexpress.configured},csv:{configured:true},ai:{configured:ai.configured}},
+   sales:{enabled:commerce.publicConfig().salesEnabled,ready:commerce.readiness().ready},
+   webhooks:publicApi.stats()});
+  // Public API v1 (API-key auth, never the owner cookie). Keys are scoped;
+  // see API-WEBHOOKS.md. No Origin requirement: API clients are not browsers.
+  if(path.startsWith('/api/v1/')){
+   const auth=publicApi.authenticate(req);
+   if(auth.storeId!=='owner')throw fail(404,'Store not found');
+   const v1Product=path.match(/^\/api\/v1\/products\/([a-zA-Z0-9_-]+)$/);
+   const v1Order=path.match(/^\/api\/v1\/orders\/(VEGA-[a-f0-9]+)$/);
+   const v1OrderShape=o=>({id:o.id,status:o.status,paymentStatus:o.paymentStatus,paymentMode:o.paymentMode,
+    lines:o.lines,subtotalCents:o.subtotalCents,shippingCents:o.shippingCents,taxCents:o.taxCents,totalCents:o.totalCents,
+    shippingMethod:o.shippingMethod,tracking:o.tracking||null,email:o.email,address:o.address,createdAt:o.createdAt,paidAt:o.paidAt||null});
+   if(path==='/api/v1/products'&&method==='GET'){publicApi.requireScope(auth,'read:products');
+    const limit=Math.min(100,Math.max(1,Number(url.searchParams.get('limit'))||20)),offset=Math.max(0,Number(url.searchParams.get('offset'))||0);
+    const all=catalog().filter(p=>p.saleReady).map(p=>({id:p.id,name:p.name,brand:p.brand,category:p.category,line:p.line,blurb:p.blurb,image:p.image,prices:p.prices,variants:p.variants||null,inStock:p.inStock,updatedAt:p.updatedAt||null}));
+    return send(res,200,{total:all.length,limit,offset,products:all.slice(offset,offset+limit)});}
+   if(v1Product&&method==='GET'){publicApi.requireScope(auth,'read:products');
+    const p=catalog().find(p=>p.id===v1Product[1]&&p.saleReady);if(!p)throw fail(404,'Product not found');
+    return send(res,200,{id:p.id,name:p.name,brand:p.brand,category:p.category,line:p.line,blurb:p.blurb,image:p.image,prices:p.prices,variants:p.variants||null,inStock:p.inStock,updatedAt:p.updatedAt||null});}
+   if(path==='/api/v1/orders'&&method==='GET'){publicApi.requireScope(auth,'read:orders');
+    const limit=Math.min(100,Math.max(1,Number(url.searchParams.get('limit'))||20)),offset=Math.max(0,Number(url.searchParams.get('offset'))||0);
+    const all=commerce.orders().map(v1OrderShape);
+    return send(res,200,{total:all.length,limit,offset,orders:all.slice(offset,offset+limit)});}
+   if(v1Order&&method==='GET'){publicApi.requireScope(auth,'read:orders');
+    const found=commerce.orders().find(o=>o.id===v1Order[1]);if(!found)throw fail(404,'Order not found');
+    return send(res,200,v1OrderShape(found));}
+   throw fail(404,'Unknown public API route');
+  }
   if(path==='/api/session'&&method==='GET'){try{owner(req);return send(res,200,{authenticated:true});}catch{return send(res,200,{authenticated:false,configured:!!password});}}
   if(path==='/api/login'&&method==='POST'){sameOrigin(req);if(!passwordHash)throw fail(503,'Set ADMIN_PASSWORD on the server before owner login');const ip=req.socket.remoteAddress;let rate=attempts.get(ip)||{count:0,until:Date.now()+60000};if(rate.until<Date.now())rate={count:0,until:Date.now()+60000};if(++rate.count>10)throw fail(429,'Too many attempts. Try again in one minute');attempts.set(ip,rate);const b=await body(req);if(typeof b.password!=='string'||b.password.length>200||!timingSafeEqual(scryptSync(b.password,salt,64),passwordHash))throw fail(401,'Incorrect password');const token=randomBytes(32).toString('hex');sessions.set(token,{expires:Date.now()+12*3600000});res.setHeader('Set-Cookie',`vegarance_owner=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=43200${req.headers['x-forwarded-proto']==='https'?'; Secure':''}`);return send(res,200,{authenticated:true});}
   if(path==='/api/logout'&&method==='POST'){sameOrigin(req);sessions.delete(owner(req));res.setHeader('Set-Cookie','vegarance_owner=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0');return send(res,200,{ok:true});}
@@ -106,6 +139,25 @@ const server=http.createServer(async(req,res)=>{
    if(path==='/api/suppliers/printful/search'&&method==='GET'){const q=(url.searchParams.get('q')||'').trim();if(!q||q.length>120)throw fail(422,'Enter a search up to 120 characters');return send(res,200,await printful.search(q));}
    if(path==='/api/suppliers/printful/draft'&&method==='POST'){const b=await body(req);if(typeof b.id!=='string'||!/^[-a-zA-Z0-9]{1,100}$/.test(b.id)||!['Fragrance','Beauty','Fashion','Accessories','Home'].includes(b.category)||typeof b.markup!=='number'||!Number.isFinite(b.markup)||b.markup<0||b.markup>1000)throw fail(422,'Invalid draft request');return send(res,200,await printful.draft(b.id,b.category,b.markup));}
    if(path==='/api/suppliers/csv/draft'&&method==='POST'){const b=await body(req);if(typeof b.csv!=='string')throw fail(422,'Provide CSV text');return send(res,200,parseCSV(b.csv));}
+   const supplierStatus=()=>({suppliers:[
+    {provider:'cj',configured:cj.configured,state:cj.configured?'connected':'not_configured',nextStep:cj.configured?'CJ is ready. Search the catalogue below to prepare drafts.':'Set CJ_API_KEY privately in Render Environment, then redeploy.'},
+    {provider:'printful',configured:printful.configured,state:printful.configured?'connected':'not_configured',nextStep:printful.configured?'Printful is ready. Search your Printful store products below. Orders stay drafts until you confirm them in Printful.':'Set PRINTFUL_API_TOKEN privately in Render Environment, then redeploy.'},
+    {provider:'aliexpress',configured:aliexpress.configured,state:aliexpress.configured?'connected':'not_configured',nextStep:aliexpress.configured?'AliExpress is ready. Search the affiliate catalogue below. Stock is not reported live — verify each listing before approving it, and fulfil orders manually in AliExpress.':'Apply in AliExpress Portals (Tools → API), then set ALIEXPRESS_APP_KEY, ALIEXPRESS_APP_SECRET and ALIEXPRESS_TRACKING_ID privately in Render Environment. Approval takes a few days.'},
+    {provider:'csv',configured:true,state:'connected',nextStep:'Paste any supplier CSV below to build drafts. No key needed; nothing is purchased.'}]});
+   if(path==='/api/suppliers/status'&&method==='GET')return send(res,200,supplierStatus());
+   if(path==='/api/suppliers/aliexpress/status'&&method==='GET')return send(res,200,{configured:aliexpress.configured,market:'AliExpress affiliate catalogue',orderAutomation:false,fulfilment:'manual'});
+   if(path==='/api/suppliers/aliexpress/search'&&method==='GET'){const q=(url.searchParams.get('q')||'').trim();if(!q||q.length>120)throw fail(422,'Enter a search up to 120 characters');return send(res,200,await aliexpress.search(q));}
+   if(path==='/api/suppliers/aliexpress/draft'&&method==='POST'){const b=await body(req);if(typeof b.id!=='string'||!/^[-a-zA-Z0-9]{1,100}$/.test(b.id)||!['Fragrance','Beauty','Fashion','Accessories','Home'].includes(b.category)||typeof b.markup!=='number'||!Number.isFinite(b.markup)||b.markup<0||b.markup>1000)throw fail(422,'Invalid draft request');return send(res,200,await aliexpress.draft(b.id,b.category,b.markup));}
+   if(path==='/api/api-keys'&&method==='GET')return send(res,200,publicApi.listKeys('owner'));
+   if(path==='/api/api-keys'&&method==='POST'){const created=publicApi.createKey('owner',await body(req));return send(res,201,created);}
+   const keyMatch=path.match(/^\/api\/api-keys\/([a-f0-9]{32})$/);
+   if(keyMatch&&method==='DELETE')return send(res,200,publicApi.revokeKey('owner',keyMatch[1]));
+   if(path==='/api/webhooks'&&method==='GET')return send(res,200,publicApi.listEndpoints('owner'));
+   if(path==='/api/webhooks'&&method==='POST'){const created=publicApi.createEndpoint('owner',await body(req));return send(res,201,created);}
+   if(path==='/api/webhooks/deliveries'&&method==='GET')return send(res,200,publicApi.deliveries('owner'));
+   const webhookMatch=path.match(/^\/api\/webhooks\/([a-f0-9]{32})(?:\/(test))?$/);
+   if(webhookMatch&&method==='DELETE')return send(res,200,publicApi.deleteEndpoint('owner',webhookMatch[1]));
+   if(webhookMatch&&webhookMatch[2]==='test'&&method==='POST')return send(res,200,await publicApi.testEndpoint('owner',webhookMatch[1]));
    if(path==='/api/products'&&method==='POST'){const p=product(await body(req));db.prepare('INSERT INTO products VALUES(?,?)').run(p.id,JSON.stringify(p));return send(res,201,p);}
    if(match){const row=db.prepare('SELECT document FROM products WHERE id=?').get(match[1]);if(!row)throw fail(404,'Product not found');if(method==='PATCH'||method==='PUT'){const p=product(await body(req),JSON.parse(row.document));db.prepare('UPDATE products SET document=? WHERE id=?').run(JSON.stringify(p),p.id);return send(res,200,p);}if(method==='DELETE'){db.prepare('DELETE FROM products WHERE id=?').run(match[1]);return send(res,200,{deleted:true,id:match[1]});}}
    if(path==='/api/settings'&&method==='GET')return send(res,200,setting());

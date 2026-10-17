@@ -3,3 +3,5 @@
 .option-editor{padding:16px;border:1px solid #dce0d4;border-radius:10px;margin:16px 0;overflow-wrap:anywhere}
 
 #merchantPolicies p{white-space:pre-wrap;overflow-wrap:anywhere}#merchantCart input{max-width:100px}#shippingChoices span{min-width:0;overflow-wrap:anywhere}
+
+.checkout-steps{display:flex;gap:8px;list-style:none;margin:0 0 20px;padding:0;flex-wrap:wrap}.checkout-steps li{flex:1;min-width:110px;font-size:12px;padding:10px 12px;border:1px solid #dce0d4;border-radius:8px;background:#fff;color:#56665b}.checkout-steps li.active{border-color:var(--accent);color:var(--accent);font-weight:700}.checkout-steps li.done{color:var(--accent);border-color:var(--accent);background:#eef3f0}
