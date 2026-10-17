@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Verify your email · VEGArance</title>
+<link rel="stylesheet" href="platform.css">
+<link rel="stylesheet" href="design-system.css">
+</head>
+<body class="ds-app">
+<a class="ds-skip-link" href="#verifyMain">Skip to verification</a>
+<header><a href="platform.html" class="wordmark">VEGArance <span>for merchants</span></a></header>
+<main id="verifyMain">
+<h1>Verify your email</h1>
+<p id="verifyStatus" role="status" aria-live="polite">Confirming your email…</p>
+<p id="verifyActions" hidden><a class="ds-btn" href="onboarding.html">Continue setup</a> <a class="ds-btn ds-btn-ghost" href="platform.html">Open dashboard</a></p>
+</main>
+<script>
+(function () {
+  var token = new URLSearchParams(location.search).get('token');
+  var status = document.getElementById('verifyStatus');
+  var actions = document.getElementById('verifyActions');
+  if (!token) { status.textContent = 'This link is missing its verification token. Request a new one from the onboarding wizard.'; status.className = 'ds-alert ds-alert-danger'; return; }
+  fetch('/api/platform/verify-email?token=' + encodeURIComponent(token), { credentials: 'same-origin' })
+    .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || ('Verification failed (' + r.status + ')')); return d; }); })
+    .then(function () { status.textContent = 'Your email is verified. You can now publish your store.'; status.className = 'ds-alert ds-alert-success'; actions.hidden = false; })
+    .catch(function (e) { status.textContent = e.message + ' Request a new verification email from the onboarding wizard.'; status.className = 'ds-alert ds-alert-danger'; });
+})();
+</script>
+</body>
+</html>
