@@ -115,7 +115,32 @@ end-to-end order.
 - [ ] USER ACTION — Do NOT invite paying merchants until payments, email,
       storage, and the live end-to-end test are all done.
 
-## 9. Catalog & content — USER ACTION
+## 9. Phase C — P1 gaps (DONE on branch `vegarance-v3`, see `PHASE-C.md`)
+- [x] DONE — Auto-ordering depth: supplier-confirmation approvals
+      (Printful / Printify / AliExpress) behind explicit merchant
+      approval + charge warning; no provider confirm is ever called
+      automatically. AliExpress manual tracking capture (merchant
+      pastes tracking, buyer notified).
+- [x] DONE — Discounts / coupons: per-store codes (percentage/fixed,
+      expiry, usage limits, min order), server-side validation at
+      quote + checkout, redemption once per paid order. No gift cards.
+- [x] DONE — Abandoned-checkout emails: quote captured, unpaid +
+      1h old → exactly one reminder via the store's Resend
+      connection; paid orders never reminded; nothing sent when
+      Resend is not configured.
+- [x] DONE — Supplier breadth: Eprolo API checked against real public
+      sources — NOT verifiable (no docs, base URL, auth, or
+      endpoints). No adapter built, nothing faked. See `EPROLO.md`.
+- [x] DONE — Multi-currency / duties display: per-store display
+      currency (merchant-supplied rate required for non-USD) +
+      duties disclosure (merchant text or standard no-rates-invented
+      disclaimer). Display only — checkout still charges USD.
+- [x] DONE — Product research / trending: deterministic 0–100
+      scoring from merchant-supplied supplier signals + grounded AI
+      summary (503 without key, 502 on guarantee language). Scores
+      are estimates, never guarantees.
+
+## 10. Catalog & content — USER ACTION
 - [ ] USER ACTION — Replace the 215 illustrative catalog entries with real,
       supplier-sourced products (or approve each one via the admin supplier
       draft flow). Never auto-approve illustrative data for paid checkout.
@@ -125,7 +150,7 @@ end-to-end order.
       the launch market and confirm the wording matches what the store
       actually does.
 
-## 10. Go-live sequence
+## 11. Go-live sequence
 1. Merge `vegarance-v2` → main (owner approval only).
 2. Configure durable storage + Render production + domain.
 3. Set every env var in sections 3–7.

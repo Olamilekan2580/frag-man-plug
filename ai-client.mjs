@@ -4,6 +4,7 @@
    Output is validated: banned delivery/stock claims are rejected, and any
    response that fails validation is a 502, never saved. When no key is
    configured every method throws 503 with an honest not-configured message. */
+import {buildTrendPrompt,validateTrendSummary,TREND_DISCLAIMER} from './trend-scoring.mjs';
 const API_DEFAULT='https://api.groq.com/openai/v1';
 const BANNED=[/in stock in nigeria/i,/next[- ]day delivery/i,/same[- ]day delivery/i,/guaranteed delivery/i,/official (product|store|distributor)/i,/\b100% (authentic|genuine|original)\b/i,/free shipping worldwide/i,/ships (today|tomorrow|immediately)/i];
 const MAX_IN=4000,MAX_OUT=1500;
@@ -50,6 +51,17 @@ export function createAI({apiKey=process.env.AI_API_KEY||'',baseUrl=process.env.
    const prompt=`Product name: ${productName}\nBrand: ${brand||'(none)'}\nCategory: ${category||'(none)'}\nTone: ${tone}\nSupplier facts (use only these):\n${specList}\nWrite the copy now as JSON.`;
    const copy=validateCopy(extractJson(await complete({system,prompt})));
    return {...copy,source:'ai',model};
+  },
+  /* Trend summary (Phase C): summarises ONLY the supplied scored items.
+     Same grounding rule as describe(): the model never sees anything but
+     the scores, the summary is validated against guarantee language,
+     and the estimate disclaimer is appended server-side. 503 when no
+     AI key is configured. */
+  async summarizeTrends(scored){
+   const prompt=buildTrendPrompt(scored);
+   const system='You summarize supplier trend estimates for VEGArance merchants. Use ONLY the figures in the user message. Never predict sales, never guarantee outcomes, never invent figures. Plain text, 120 words or fewer.';
+   const summary=validateTrendSummary(await complete({system,prompt}));
+   return {summary:summary+'\n\n'+TREND_DISCLAIMER,source:'ai',model};
   },
  };
 }

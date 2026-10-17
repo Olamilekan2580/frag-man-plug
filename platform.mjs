@@ -2,6 +2,11 @@ import {createMerchantCommerce} from './merchant-commerce.mjs';
 import {createMerchantInventory} from './merchant-inventory.mjs';
 import {createMerchantConnections} from './merchant-connections.mjs';
 import {createMerchantBilling} from './merchant-billing.mjs';
+import {createMerchantCoupons} from './merchant-coupons.mjs';
+import {createMerchantAbandoned} from './merchant-abandoned.mjs';
+import {createMerchantFulfillment} from './merchant-fulfillment-approval.mjs';
+import {rankProducts} from './trend-scoring.mjs';
+import {createAI} from './ai-client.mjs';
 import {deriveOnboarding} from './onboarding.mjs';
 import {randomBytes, scrypt, timingSafeEqual, createHash} from 'node:crypto';
 import {promisify} from 'node:util';
@@ -20,7 +25,7 @@ export function createPlatformMailer({env=process.env,fetcher=fetch}={}){
   let response;try{response=await fetcher('https://api.resend.com/emails',{method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({from,to:[to],subject,text:bodyText}),signal:AbortSignal.timeout(20000)});}catch{throw fail(502,'Email provider is temporarily unavailable. Try again later.');}
   if(!response.ok)throw fail(502,'Email provider rejected the message. Check the platform sender configuration.');return true;}};
 }
-export function createPlatform({db,body,send,sameOrigin,now=Date.now,env=process.env,connectionsFactory=createMerchantConnections,publicApi=null,onOrderEvent=null,mailerFactory=createPlatformMailer}){
+export function createPlatform({db,body,send,sameOrigin,now=Date.now,env=process.env,connectionsFactory=createMerchantConnections,publicApi=null,onOrderEvent=null,mailerFactory=createPlatformMailer,aiFactory=createAI}){
  db.exec(`PRAGMA foreign_keys=ON;
  CREATE TABLE IF NOT EXISTS merchants(id TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL,name TEXT NOT NULL,salt TEXT NOT NULL,password_hash TEXT NOT NULL,created_at INTEGER NOT NULL);
  CREATE TABLE IF NOT EXISTS merchant_sessions(token_hash TEXT PRIMARY KEY,merchant_id TEXT NOT NULL REFERENCES merchants(id),expires INTEGER NOT NULL);
@@ -32,7 +37,11 @@ export function createPlatform({db,body,send,sameOrigin,now=Date.now,env=process
  const connections=connectionsFactory({db,env,now});
  const inventory=createMerchantInventory({db,connections,now});
  const billing=createMerchantBilling({db,now});
- const commerce=createMerchantCommerce({db,connections,inventory,env,now,onOrderEvent,billing});
+ const coupons=createMerchantCoupons({db,now});
+ const abandoned=createMerchantAbandoned({db,now});
+ const fulfillment=createMerchantFulfillment({db,now});
+ const ai=aiFactory({env});
+ const commerce=createMerchantCommerce({db,connections,inventory,env,now,onOrderEvent,billing,coupons,abandoned,fulfillment});
  const publicRates=new Map();
  function checkoutLimit(req){const ip=req.socket.remoteAddress,old=publicRates.get(ip),entry=old&&old.until>now()?old:{count:0,until:now()+60000};entry.count++;publicRates.set(ip,entry);if(publicRates.size>10000)for(const [k,v] of publicRates)if(v.until<now())publicRates.delete(k);if(entry.count>30)throw fail(429,'Too many checkout requests. Please try again shortly.');}
  const rates=new Map();let hashes=0;
@@ -73,11 +82,11 @@ export function createPlatform({db,body,send,sameOrigin,now=Date.now,env=process
    const orderMatch=path.match(/^\/api\/v1\/orders\/(MORD-[a-f0-9]{24})$/);
    if(path==='/api/v1/orders'&&method==='GET'){publicApi.requireScope(auth,'read:orders');
     const limit=Math.min(100,Math.max(1,Number(url.searchParams.get('limit'))||20)),offset=Math.max(0,Number(url.searchParams.get('offset'))||0);
-    const all=commerce.orders(auth.storeId).map(o=>({id:o.id,status:o.status,paymentStatus:o.paymentStatus,paymentMode:o.paymentMode,lines:o.lines,subtotalCents:o.subtotalCents,shippingCents:o.shippingCents,taxCents:o.taxCents,totalCents:o.totalCents,shippingMethod:o.shippingMethod,tracking:o.tracking||null,email:o.email,address:o.address,createdAt:o.createdAt,paidAt:o.paidAt||null}));
+    const all=commerce.orders(auth.storeId).map(o=>({id:o.id,status:o.status,paymentStatus:o.paymentStatus,paymentMode:o.paymentMode,lines:o.lines,subtotalCents:o.subtotalCents,discountCents:o.discountCents||0,couponCode:o.couponCode||null,shippingCents:o.shippingCents,taxCents:o.taxCents,totalCents:o.totalCents,shippingMethod:o.shippingMethod,tracking:o.tracking||null,email:o.email,address:o.address,createdAt:o.createdAt,paidAt:o.paidAt||null}));
     send(res,200,{total:all.length,limit,offset,orders:all.slice(offset,offset+limit)});return true;}
    if(orderMatch&&method==='GET'){publicApi.requireScope(auth,'read:orders');
     const found=commerce.orders(auth.storeId).find(o=>o.id===orderMatch[1]);if(!found)throw fail(404,'Order not found');
-    send(res,200,{id:found.id,status:found.status,paymentStatus:found.paymentStatus,paymentMode:found.paymentMode,lines:found.lines,subtotalCents:found.subtotalCents,shippingCents:found.shippingCents,taxCents:found.taxCents,totalCents:found.totalCents,shippingMethod:found.shippingMethod,tracking:found.tracking||null,email:found.email,address:found.address,createdAt:found.createdAt,paidAt:found.paidAt||null});return true;}
+    send(res,200,{id:found.id,status:found.status,paymentStatus:found.paymentStatus,paymentMode:found.paymentMode,lines:found.lines,subtotalCents:found.subtotalCents,discountCents:found.discountCents||0,couponCode:found.couponCode||null,shippingCents:found.shippingCents,taxCents:found.taxCents,totalCents:found.totalCents,shippingMethod:found.shippingMethod,tracking:found.tracking||null,email:found.email,address:found.address,createdAt:found.createdAt,paidAt:found.paidAt||null});return true;}
    throw fail(404,'Unknown public API route');
   }
   if(!path.startsWith('/api/platform/'))return false;
@@ -124,9 +133,28 @@ export function createPlatform({db,body,send,sameOrigin,now=Date.now,env=process
   if(path==='/api/platform/billing'&&method==='GET'){send(res,200,{billing:billing.get(merchant.id),plans:billing.plans()});return true;}
   if(path==='/api/platform/billing/trial'&&method==='POST'){send(res,200,{billing:billing.startTrial(merchant.id)});return true;}
   if(path==='/api/platform/billing/cancel'&&method==='POST'){send(res,200,{billing:billing.cancel(merchant.id)});return true;}
+  /* Phase C — per-store coupons (merchant CRUD; codes are never exposed
+     on the public storefront config) and product-research trend scoring
+     (deterministic scores from merchant-supplied supplier signals,
+     optional AI summary when AI_API_KEY is configured). */
+  const couponRoute=path.match(/^\/api\/platform\/stores\/([a-f0-9]{32})\/coupons(?:\/([a-f0-9]{32}))?$/);
+  if(couponRoute){store(couponRoute[1],merchant.id);
+   if(!couponRoute[2]&&method==='GET')send(res,200,coupons.list(couponRoute[1]));
+   else if(!couponRoute[2]&&method==='POST')send(res,201,coupons.create(couponRoute[1],await body(req)));
+   else if(couponRoute[2]&&method==='PUT')send(res,200,coupons.update(couponRoute[1],couponRoute[2],await body(req)));
+   else if(couponRoute[2]&&method==='DELETE')send(res,200,coupons.remove(couponRoute[1],couponRoute[2]));
+   else throw fail(405,'Method not allowed');return true;}
+  const trendRoute=path.match(/^\/api\/platform\/stores\/([a-f0-9]{32})\/trends$/);
+  if(trendRoute&&method==='POST'){store(trendRoute[1],merchant.id);
+   const input=await body(req);
+   if(!Array.isArray(input.items)||!input.items.length||input.items.length>50)throw fail(422,'Provide 1–50 products with supplier signals');
+   const scored=rankProducts(input.items.map(item=>{if(!item||typeof item!=='object'||typeof item.name!=='string')throw fail(422,'Each trend item needs a name');return {name:item.name,signals:item.signals||{}};}));
+   let summary=null;
+   if(input.aiSummary===true){if(!ai.configured)throw fail(503,'Configure AI_API_KEY privately on Render to use AI trend summaries.');summary=await ai.summarizeTrends(scored);}
+   send(res,200,{scored,summary,disclaimer:'Scores are estimates from supplier data supplied by the merchant — not a guarantee of sales.'});return true;}
   if(path==='/api/platform/stores'&&method==='GET'){send(res,200,stores(merchant.id));return true;}
   if(path==='/api/platform/stores'&&method==='POST'){const gate=billing.gate(merchant.id,'create_store',{currentStores:stores(merchant.id).length});if(!gate.allowed)throw fail(402,gate.reason);const input=await body(req),slug=text(input.slug,48,true).toLowerCase();if(!/^[a-z0-9](?:[a-z0-9-]{1,46}[a-z0-9])$/.test(slug))throw fail(422,'Store URL must be 3–48 lowercase letters, numbers or hyphens');if(stores(merchant.id).length>=5)throw fail(422,'You can create up to five stores');const cfg=settings({...input,published:false}),storeId=id();try{db.prepare('INSERT INTO merchant_stores VALUES(?,?,?,?)').run(storeId,merchant.id,slug,JSON.stringify(cfg));}catch(e){if(e.code?.startsWith('ERR_SQLITE'))throw fail(409,'That store URL is already taken');throw e;}send(res,201,store(storeId,merchant.id));return true;}
-  const operationRoute=path.match(/^\/api\/platform\/stores\/([a-f0-9]{32})\/(?:orders\/(MORD-[a-f0-9]{24})\/(refund|refund_reconcile|dispatch|fund|tracking|reconcile)|emails\/(MORD-[a-f0-9]{24}-(?:receipt|shipping|refund))\/retry)$/);
+  const operationRoute=path.match(/^\/api\/platform\/stores\/([a-f0-9]{32})\/(?:orders\/(MORD-[a-f0-9]{24})\/(refund|refund_reconcile|dispatch|fund|tracking|reconcile|fulfillment_request|fulfillment_confirm|fulfillment_reject|aliexpress_tracking)|emails\/(MORD-[a-f0-9]{24}-(?:receipt|shipping|refund))\/retry)$/);
   if(operationRoute&&method==='POST'){store(operationRoute[1],merchant.id);if(operationRoute[4])send(res,200,commerce.retryEmail(operationRoute[1],operationRoute[4]));else{await commerce.action(operationRoute[1],operationRoute[2],operationRoute[3],await body(req));send(res,200,commerce.orders(operationRoute[1]));}return true;}
   const salesRoute=path.match(/^\/api\/platform\/stores\/([a-f0-9]{32})\/(?:sales|orders(?:\/(MORD-[a-f0-9]{24})\/verify)?)$/);
   if(salesRoute){store(salesRoute[1],merchant.id);if(path.endsWith('/sales')&&method==='GET')send(res,200,commerce.dashboard(salesRoute[1]));else if(path.endsWith('/sales')&&method==='PUT')send(res,200,commerce.configure(salesRoute[1],await body(req)));else if(salesRoute[2]&&method==='POST'){await commerce.verify(salesRoute[1],salesRoute[2]);send(res,200,commerce.orders(salesRoute[1]));}else if(path.endsWith('/orders')&&method==='GET')send(res,200,commerce.orders(salesRoute[1]));else throw fail(405,'Method not allowed');return true;}

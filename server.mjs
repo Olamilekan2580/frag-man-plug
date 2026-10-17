@@ -84,7 +84,7 @@ const server=http.createServer(async(req,res)=>{
   if(path==='/api/health')return send(res,200,{ok:true,storage:'sqlite',time:new Date().toISOString(),
    storageDetail:describeStorage(process.env),
    billing:{provider:process.env.BILLING_PROVIDER||'none',enabled:false,chargesLive:false,note:'No billing provider is connected. Merchant billing is scaffolding only — no charges are possible. See MERCHANT-BILLING.md.'},
-   suppliers:{cj:{configured:cj.configured},printful:{configured:printful.configured},printify:{configured:printify.configured},aliexpress:{configured:aliexpress.configured},csv:{configured:true},ai:{configured:ai.configured}},
+   suppliers:{cj:{configured:cj.configured},printful:{configured:printful.configured},printify:{configured:printify.configured},aliexpress:{configured:aliexpress.configured},csv:{configured:true},eprolo:{configured:false,state:'not_integrated',note:'No verified public Eprolo API — see EPROLO.md. No adapter, nothing faked.'},ai:{configured:ai.configured}},
    sales:{enabled:commerce.publicConfig().salesEnabled,ready:commerce.readiness().ready},
    webhooks:publicApi.stats()});
   // Public API v1 (API-key auth, never the owner cookie). Keys are scoped;
@@ -161,6 +161,7 @@ const server=http.createServer(async(req,res)=>{
     {provider:'printful',configured:printful.configured,state:printful.configured?'connected':'not_configured',nextStep:printful.configured?'Printful is ready. Search your Printful store products below. Orders stay drafts until you confirm them in Printful.':'Set PRINTFUL_API_TOKEN privately in Render Environment, then redeploy.'},
     {provider:'printify',configured:printify.configured,state:printify.configured?'connected':'not_configured',nextStep:printify.configured?'Printify is ready. Search your Printify shop products below. Orders stay drafts until you send them to production in Printify.':'Set PRINTIFY_API_TOKEN and PRINTIFY_SHOP_ID privately in Render Environment, then redeploy. The token lasts 1 year — calendar a rotation reminder.'},
     {provider:'aliexpress',configured:aliexpress.configured,state:aliexpress.configured?'connected':'not_configured',nextStep:aliexpress.configured?'AliExpress is ready. Search the affiliate catalogue below. Stock is not reported live — verify each listing before approving it, and fulfil orders manually in AliExpress.':'Apply in AliExpress Portals (Tools → API), then set ALIEXPRESS_APP_KEY, ALIEXPRESS_APP_SECRET and ALIEXPRESS_TRACKING_ID privately in Render Environment. Approval takes a few days.'},
+    {provider:'eprolo',configured:false,state:'not_integrated',nextStep:'No Eprolo adapter: Eprolo publishes no public API documentation (no base URL, auth scheme or endpoints). See EPROLO.md — contact Eprolo for API access before any integration is built.'},
     {provider:'csv',configured:true,state:'connected',nextStep:'Paste any supplier CSV below to build drafts. No key needed; nothing is purchased.'}]});
    if(path==='/api/suppliers/status'&&method==='GET')return send(res,200,supplierStatus());
    if(path==='/api/suppliers/aliexpress/status'&&method==='GET')return send(res,200,{configured:aliexpress.configured,market:'AliExpress affiliate catalogue',orderAutomation:false,fulfilment:'manual'});

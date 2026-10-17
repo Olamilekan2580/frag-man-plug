@@ -174,7 +174,8 @@ import {createPublicApi, signWebhookBody, verifyWebhookSignature} from './public
     assert.ok(history.data.some(d => d.state === 'sent' && d.event === 'webhook.test'));
     // Supplier status aggregates every provider with a next step.
     const suppliers = await req('/api/suppliers/status', 'GET', undefined, {Cookie: ownerCookie});
-    assert.deepEqual(suppliers.data.suppliers.map(s => s.provider), ['cj', 'printful', 'printify', 'aliexpress', 'csv']);
+    assert.deepEqual(suppliers.data.suppliers.map(s => s.provider), ['cj', 'printful', 'printify', 'aliexpress', 'eprolo', 'csv']);
+    assert.equal(suppliers.data.suppliers.find(s => s.provider === 'eprolo').state, 'not_integrated', 'Phase C: Eprolo is honestly not_integrated — no verified public API, no faked adapter (see EPROLO.md)');
     assert.ok(suppliers.data.suppliers.every(s => s.nextStep && s.state));
     // AliExpress without keys -> honest 503.
     assert.equal((await req('/api/suppliers/aliexpress/status', 'GET', undefined, {Cookie: ownerCookie})).data.configured, false);

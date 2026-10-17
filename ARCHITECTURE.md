@@ -197,7 +197,43 @@ live merchant payments, no claimed live integrations.
   `billing` block. `merchant-commerce` readiness uses
   `describeStorage(env)` for the storage check.
 
-## 5. Deliberately deferred (later phases — NOT in Phase A)
+## 7. Phase C — P1 gaps (auto-ordering depth, coupons, abandoned checkout, supplier breadth, multi-currency/duties, trend scoring)
+
+**Ground truth unchanged:** multi-merchant platform, no invented keys /
+accounts / live integrations / fake data. No live supplier charges
+from any Phase C code. See `PHASE-C.md` for the full per-area
+real / not-real table.
+
+| Area | Module(s) | What is real | What is explicitly NOT real |
+|---|---|---|---|
+| Auto-ordering depth | `merchant-fulfillment-approval.mjs` | Supplier-confirmation approvals (Printful / Printify / AliExpress): merchant reviews provider + draft + estimated charge, then explicitly confirms with `confirmCharge: true`. Charge warning names the provider + approximate amount. Manual tracking capture: merchant pastes the AliExpress tracking number; system validates, stores, marks Shipped, notifies buyer. Order actions `fulfillment_request` / `fulfillment_confirm` / `fulfillment_reject` / `aliexpress_tracking` | NO provider confirm call — the charge step still happens in the Printful / Printify dashboard. `send_to_production` / Printful `confirm` never called. AliExpress ordering stays manual |
+| Discounts / coupons | `merchant-coupons.mjs` | Per-store codes: percentage (1–90%) or fixed cents, expiry, usage limits, min order. Server-side validation at quote + checkout. Discount on merchandise subtotal only, capped at subtotal; tax on discounted subtotal. Redemption once per order, only when verified paid. Merchant CRUD routes; buyer field on storefront checkout | NO gift cards. Invalid code = 422, never a silent discount. Codes never exposed on public config |
+| Abandoned checkout | `merchant-abandoned.mjs` + operations tick | Quote captured as abandoned; unpaid + older than 1h → exactly ONE reminder via the store's Resend connection. Paid orders convert, never reminded | NO email marketing / campaigns. No Resend connection → nothing queued, nothing recorded as sent |
+| Supplier breadth | `EPROLO.md` | Eprolo API checked against real public sources: NOT verifiable (no docs, base URL, auth, or endpoints). Documented; status reports `not_integrated` | NO Eprolo adapter. Nothing faked |
+| Multi-currency / duties | `merchant-currency.mjs` | Per-store display currency (16 currencies); merchant-supplied exchange rate required for non-USD. Duties: merchant text OR standard no-rates-invented disclaimer. Shown on storefront + `publicConfig.currency` | DISPLAY ONLY — checkout still charges USD. No invented duty rates, no Markets / merchant-of-record |
+| Product research / trending | `trend-scoring.mjs` + `ai-client.summarizeTrends` | Deterministic 0–100 scoring from merchant-supplied supplier signals only (sales, trend, stock, price movement). Breakdown, confidence, label, notes, estimate disclaimer. `POST /api/platform/stores/{id}/trends`; optional grounded AI summary (503 without key, 502 on guarantee language) | NO fetched/invented trend data, NO sales predictions, NO guarantees |
+
+### Data-flow deltas (Phase C)
+
+- Coupons: `platform.mjs` creates `createMerchantCoupons({db})` →
+  commerce. Quote stores discount; checkout re-validates; `verify`
+  records redemption on paid. Order payloads carry `discountCents` +
+  `couponCode`.
+- Abandoned: `platform.mjs` creates `createMerchantAbandoned({db})`
+  → commerce (capture on quote, convert on paid) + operations
+  (single-reminder scan in `tick()`; reminder jobs kind `abandoned`,
+  id `ABANDONED-{quoteId}`).
+- Fulfillment: `platform.mjs` creates
+  `createMerchantFulfillment({db})` → commerce → operations; four new
+  order-operation kinds.
+- Currency: `merchant-commerce.configure()` accepts
+  `displayCurrency / exchangeRates / dutiesMode / dutiesDisclosure`
+  (merchant rate required for non-USD); `publicConfig()` exposes
+  `currency` + `couponsAccepted`.
+- Trends: `POST /api/platform/stores/{id}/trends` (merchant auth, no
+  writes); scoring is pure, AI summary grounded in scored items only.
+
+## 8. Deliberately deferred (later phases — NOT in Phase A)
 
 Per the research build order (`dropshipping-platform-research.md` §8):
 
@@ -214,12 +250,25 @@ Per the research build order (`dropshipping-platform-research.md` §8):
   USER ACTION.
 - **Custom merchant domains** — design documented (Phase B, see
   `CUSTOM-DOMAINS.md`); NOT BUILT. Merchants live at `/shops/{slug}`.
-- **Auto-ordering depth** — Printful/Printify confirm flow (explicit
-  merchant opt-in + charge warning), AliExpress tracking capture.
-- **Discounts / coupons / gift cards; abandoned-checkout emails.**
-- **Product research / trend scoring; multi-currency / Markets /
-  duties; customer accounts; reviews; analytics depth; chargeback
-  evidence packs; multi-channel feed export; SEO depth.**
+- **Auto-ordering depth** — DONE (Phase C): Printful/Printify
+  confirm flow behind explicit merchant approval + charge warning
+  (approval record; provider confirm still happens in the provider
+  dashboard), AliExpress manual tracking capture.
+- **Discounts / coupons** — DONE (Phase C): per-store coupon codes
+  with server-side validation. **Gift cards** still NOT built.
+- **Abandoned-checkout emails** — DONE (Phase C): single reminder
+  per abandonment via Resend when configured. Email *marketing* /
+  campaigns still NOT built.
+- **Product research / trend scoring** — DONE (Phase C):
+  deterministic scoring from merchant-supplied supplier signals +
+  grounded AI summary.
+- **Multi-currency / duties** — DONE (Phase C) as DISPLAY ONLY:
+  per-store display currency (merchant-supplied rate) + duties
+  disclosure. **Markets / merchant-of-record, local payment
+  methods** still NOT built.
+- **Customer accounts; reviews; analytics depth; chargeback
+  evidence packs; multi-channel feed export; SEO depth** — still
+  deferred.
 - **Layout rewrite** of the legacy stylesheets — Phase A is a token +
   component layer on top, not a layout rewrite.
 - **No merge to main.** Phase A lives on branch `vegarance-v3` only.
