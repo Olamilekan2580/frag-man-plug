@@ -1,0 +1,120 @@
+/* VEGArance support chat widget. Standalone companion to support-widget.js.
+   The widget is NOT auto-injected: it only appears where init() mounts it. */
+.vega-support {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 50;
+  font-family: inherit;
+  color: #14201a;
+}
+.vega-support__toggle {
+  display: inline-block;
+  padding: 0.65rem 1.1rem;
+  border: 0;
+  border-radius: 999px;
+  background: #0e3b2e;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+.vega-support__toggle:hover { background: #12503e; }
+.vega-support__toggle:focus-visible,
+.vega-support__close:focus-visible,
+.vega-support__send:focus-visible,
+.vega-support__input:focus-visible {
+  outline: 3px solid #f2c94c;
+  outline-offset: 2px;
+}
+.vega-support__panel {
+  width: min(22rem, calc(100vw - 2rem));
+  margin-top: 0.6rem;
+  overflow: hidden;
+  border: 1px solid #d8ddd9;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+}
+.vega-support__panel[hidden] { display: none; }
+.vega-support__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.7rem 0.9rem;
+  background: #0e3b2e;
+  color: #fff;
+}
+.vega-support__close {
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+.vega-support__messages {
+  min-height: 10rem;
+  max-height: 18rem;
+  margin: 0;
+  padding: 0.8rem;
+  overflow-y: auto;
+  list-style: none;
+}
+.vega-support__message {
+  max-width: 88%;
+  margin: 0 0 0.6rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.9rem;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+.vega-support__message--user {
+  margin-left: auto;
+  background: #0e3b2e;
+  color: #fff;
+}
+.vega-support__message--assistant {
+  margin-right: auto;
+  background: #eef2ef;
+  color: #14201a;
+}
+.vega-support__form { padding: 0.7rem 0.9rem 0.9rem; }
+.vega-support__label {
+  display: block;
+  margin: 0.5rem 0 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.vega-support__label:first-child { margin-top: 0; }
+.vega-support__input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid #c9d0cb;
+  border-radius: 0.5rem;
+  font: inherit;
+}
+.vega-support__send {
+  margin-top: 0.7rem;
+  padding: 0.55rem 1.2rem;
+  border: 0;
+  border-radius: 999px;
+  background: #0e3b2e;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.vega-support__send:disabled { opacity: 0.55; cursor: wait; }
+.vega-support__status { min-height: 1.2rem; margin: 0.5rem 0 0; font-size: 0.85rem; color: #5a655e; }
+@media (prefers-reduced-motion: reduce) {
+  .vega-support *,
+  .vega-support *::before,
+  .vega-support *::after {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
+}
