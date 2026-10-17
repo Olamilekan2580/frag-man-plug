@@ -4,6 +4,7 @@ document.getElementById('pane-products').append(supplierPanel);
 const PROVIDERS=[
  {id:'cj',title:'CJ Dropshipping',blurb:'Search products with US inventory. Fulfilment is owner-controlled: dispatch and funding are separate steps on paid orders.',note:'Review descriptions, margin after shipping, and stock. Supplier options start unavailable until reviewed.'},
  {id:'printful',title:'Printful (print-on-demand)',blurb:'Search your Printful store products. Made to order — there are no stock counts. Orders stay drafts until you confirm them in Printful.',note:'Made to order. Confirm the order in the Printful dashboard after reviewing it — this store never confirms automatically.'},
+ {id:'printify',title:'Printify (print-on-demand)',blurb:'Search your Printify shop products. Made to order — there are no stock counts. Orders stay On hold until you send them to production in Printify.',note:'Made to order. Set order approval to manual in Printify and confirm each order in the Printify dashboard — this store never sends an order to production automatically. Confirm Nigeria delivery per product before listing.'},
  {id:'aliexpress',title:'AliExpress (affiliate catalogue)',blurb:'Search the AliExpress affiliate catalogue. Stock is NOT reported live and fulfilment is manual — you place and pay for each order in AliExpress.',note:'Draft from affiliate data. Verify stock, shipping time and final cost on the live AliExpress listing before approving for sale.'},
 ];
 function fillEditor(draft,notice){
