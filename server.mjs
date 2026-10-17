@@ -2,8 +2,14 @@ import {createPlatform} from './platform.mjs';
 import http from 'node:http';
 import {createCommerce} from './commerce.mjs';
 import {createCJ} from './cj-client.mjs';
+import {createPrintful} from './printful-client.mjs';
+import {createAI} from './ai-client.mjs';
+import {parseCSV} from './csv-import.mjs';
+import {applyRules,validateRules} from './pricing.mjs';
 import {createSupplierSync} from './supplier-sync.mjs';
 const cj=createCJ();
+const printful=createPrintful();
+const ai=createAI();
 import {readFileSync,existsSync,mkdirSync,writeFileSync,statSync} from 'node:fs';
 import {resolve,extname,basename} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -34,13 +40,13 @@ function product(input,existing=null){
  p.category??='Fragrance';if(!['Fragrance','Beauty','Fashion','Accessories','Home'].includes(p.category))throw fail(422,'Invalid category');
  p.taxCode??='';if(typeof p.taxCode!=='string'||(p.taxCode&&!/^\d{5,10}$/.test(p.taxCode)))throw fail(422,'Invalid product tax code');
  if(p.saleReady!==undefined&&typeof p.saleReady!=='boolean')throw fail(422,'Invalid sale approval');
- if(p.saleReady&&(!p.supplier||!p.image||!p.blurb.trim()))throw fail(422,'Approved products need CJ sourcing, an image, and a description');
+ if(p.saleReady&&(!p.supplier||!p.image||!p.blurb.trim()))throw fail(422,'Approved products need supplier sourcing, an image, and a description');
  if(typeof p.inStock!=='boolean')throw fail(422,'Stock must be true or false');
  let variants;
  if(p.variants!==undefined){if(!Array.isArray(p.variants)||!p.variants.length||p.variants.length>100)throw fail(422,'Provide 1–100 product options');const ids=new Set();variants=p.variants.map(v=>{if(!v||typeof v.id!=='string'||!/^[-a-zA-Z0-9_]{1,100}$/.test(v.id)||ids.has(v.id)||typeof v.label!=='string'||!v.label.trim()||v.label.length>160||typeof v.inStock!=='boolean'||(v.sku!==undefined&&(typeof v.sku!=='string'||v.sku.length>100)))throw fail(422,'Invalid or duplicate product option');ids.add(v.id);return {id:v.id,label:v.label.trim(),sku:v.sku||'',inStock:v.inStock};});}
  if(p.category!=='Fragrance'&&!variants)throw fail(422,'Lifestyle products require product options');
  if(!p.prices||typeof p.prices!=='object')throw fail(422,'Prices required');const prices={};for(const size of variants?variants.map(v=>v.id):['3ml','5ml','10ml']){const n=p.prices[size];if(typeof n!=='number'||!Number.isFinite(n)||n<=0||n>10000)throw fail(422,`Invalid ${size} price`);prices[size]=Math.round(n*100)/100;}
- let supplier;if(p.supplier!==undefined){if(!p.supplier||p.supplier.provider!=='cj'||typeof p.supplier.productId!=='string'||!/^[-a-zA-Z0-9]{1,100}$/.test(p.supplier.productId))throw fail(422,'Invalid supplier reference');supplier={provider:'cj',productId:p.supplier.productId};}
+ let supplier;if(p.supplier!==undefined){if(!p.supplier||!['cj','printful','csv'].includes(p.supplier.provider)||typeof p.supplier.productId!=='string'||!/^[-a-zA-Z0-9:]{1,100}$/.test(p.supplier.productId))throw fail(422,'Invalid supplier reference');supplier={provider:p.supplier.provider,productId:p.supplier.productId};}
  return {taxCode:p.taxCode,saleReady:p.saleReady===true,...(supplier?{supplier}:{}),...(existing?.supplierSync&&supplier?.productId===existing.supplier?.productId?{supplierSync:existing.supplierSync}:{}),id:existing?.id||'p-'+randomBytes(8).toString('hex'),name:p.name,brand:p.brand,category:p.category,line:p.line,blurb:p.blurb,mono:p.brand.slice(0,3).toUpperCase(),prices,inStock:p.inStock,image:p.image,...(variants?{variants}:{}),badges:[],updatedAt:new Date().toISOString()};
 }
 const publicRates=new Map();
@@ -93,6 +99,13 @@ const server=http.createServer(async(req,res)=>{
    if(path==='/api/suppliers/cj/status'&&method==='GET')return send(res,200,{configured:cj.configured,market:'US',orderAutomation:false});
    if(path==='/api/suppliers/cj/search'&&method==='GET'){const q=(url.searchParams.get('q')||'').trim();if(!q||q.length>120)throw fail(422,'Enter a search up to 120 characters');return send(res,200,await cj.search(q));}
    if(path==='/api/suppliers/cj/draft'&&method==='POST'){const b=await body(req);if(typeof b.id!=='string'||!/^[-a-zA-Z0-9]{1,100}$/.test(b.id)||!['Fragrance','Beauty','Fashion','Accessories','Home'].includes(b.category)||typeof b.markup!=='number'||!Number.isFinite(b.markup)||b.markup<0||b.markup>1000)throw fail(422,'Invalid draft request');return send(res,200,await cj.draft(b.id,b.category,b.markup));}
+   if(path==='/api/ai/status'&&method==='GET')return send(res,200,{configured:ai.configured,model:ai.model});
+   if(path==='/api/ai/describe'&&method==='POST'){const b=await body(req);return send(res,200,await ai.describe({name:b.name,brand:b.brand,category:b.category,specs:b.specs}));}
+   if(path==='/api/pricing/preview'&&method==='POST'){const b=await body(req);if(typeof b.cost!=='number')throw fail(422,'Invalid cost');return send(res,200,applyRules({cost:b.cost,shipping:b.shipping??0,rules:validateRules(b.rules||{})}));}
+   if(path==='/api/suppliers/printful/status'&&method==='GET')return send(res,200,{configured:printful.configured,market:'POD',orderAutomation:false});
+   if(path==='/api/suppliers/printful/search'&&method==='GET'){const q=(url.searchParams.get('q')||'').trim();if(!q||q.length>120)throw fail(422,'Enter a search up to 120 characters');return send(res,200,await printful.search(q));}
+   if(path==='/api/suppliers/printful/draft'&&method==='POST'){const b=await body(req);if(typeof b.id!=='string'||!/^[-a-zA-Z0-9]{1,100}$/.test(b.id)||!['Fragrance','Beauty','Fashion','Accessories','Home'].includes(b.category)||typeof b.markup!=='number'||!Number.isFinite(b.markup)||b.markup<0||b.markup>1000)throw fail(422,'Invalid draft request');return send(res,200,await printful.draft(b.id,b.category,b.markup));}
+   if(path==='/api/suppliers/csv/draft'&&method==='POST'){const b=await body(req);if(typeof b.csv!=='string')throw fail(422,'Provide CSV text');return send(res,200,parseCSV(b.csv));}
    if(path==='/api/products'&&method==='POST'){const p=product(await body(req));db.prepare('INSERT INTO products VALUES(?,?)').run(p.id,JSON.stringify(p));return send(res,201,p);}
    if(match){const row=db.prepare('SELECT document FROM products WHERE id=?').get(match[1]);if(!row)throw fail(404,'Product not found');if(method==='PATCH'||method==='PUT'){const p=product(await body(req),JSON.parse(row.document));db.prepare('UPDATE products SET document=? WHERE id=?').run(JSON.stringify(p),p.id);return send(res,200,p);}if(method==='DELETE'){db.prepare('DELETE FROM products WHERE id=?').run(match[1]);return send(res,200,{deleted:true,id:match[1]});}}
    if(path==='/api/settings'&&method==='GET')return send(res,200,setting());
